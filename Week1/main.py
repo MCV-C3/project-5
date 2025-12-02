@@ -11,7 +11,7 @@ import os
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 
-
+SPLIT_PATH = "../data/MIT_split/"
 
 
 def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"]):
@@ -71,20 +71,20 @@ def train(dataset: List[Tuple[Type[Image.Image], int]],
     return bovw, classifier
 
 
-def Dataset(ImageFolder:str = "data/MIT_split/train") -> List[Tuple[Type[Image.Image], int]]:
+def Dataset(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[Type[Image.Image], int]]:
 
     """
     Expected Structure:
 
-        ImageFolder/<cls label>/xxx1.png
-        ImageFolder/<cls label>/xxx2.png
-        ImageFolder/<cls label>/xxx3.png
+        ImageFolder/<cls label>/xxx1.jpg
+        ImageFolder/<cls label>/xxx2.jpg
+        ImageFolder/<cls label>/xxx3.jpg
         ...
 
         Example:
-            ImageFolder/cat/123.png
-            ImageFolder/cat/nsdf3.png
-            ImageFolder/cat/[...]/asd932_.png
+            ImageFolder/cat/123.jpg
+            ImageFolder/cat/nsdf3.jpg
+            ImageFolder/cat/[...]/asd932_.jpg
     
     """
 
@@ -109,9 +109,8 @@ def Dataset(ImageFolder:str = "data/MIT_split/train") -> List[Tuple[Type[Image.I
 
 
 if __name__ == "__main__":
-     #/home/cboned/data/Master/MIT_split
-    data_train = Dataset(ImageFolder="/home/cboned/data/Master/MIT_split/train")
-    data_test = Dataset(ImageFolder="/home/cboned/data/Master/MIT_split/test") 
+    data_train = Dataset(ImageFolder=SPLIT_PATH+"train")
+    data_test = Dataset(ImageFolder=SPLIT_PATH+"test") 
 
     bovw = BOVW()
     
