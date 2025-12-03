@@ -14,28 +14,30 @@ from sklearn.metrics import accuracy_score
 SPLIT_PATH = "../data/MIT_split/"
 
 
-def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"]):
-    return np.array([bovw._compute_codebook_descriptor(descriptors=descriptor, kmeans=bovw.codebook_algo) for descriptor in descriptors])
+def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"], kpts: Literal["N", "T"]):
+    return np.array([bovw._compute_codebook_descriptor(kpts=kpt, descriptors=descriptor, kmeans=bovw.codebook_algo) for kpt,descriptor in zip(kpts,descriptors)])
 
 
 def test(dataset: List[Tuple[Type[Image.Image], int]]
          , bovw: Type[BOVW], 
          classifier:Type[object]):
     
+    test_kpts = []
     test_descriptors = []
     descriptors_labels = []
     
     for idx in tqdm.tqdm(range(len(dataset)), desc="Phase [Eval]: Extracting the descriptors"):
         image, label = dataset[idx]
-        _, descriptors = bovw._extract_features(image=np.array(image))
+        kpts, descriptors = bovw._extract_features(image=np.array(image))
         
         if descriptors is not None:
+            test_kpts.append(kpts)
             test_descriptors.append(descriptors)
             descriptors_labels.append(label)
             
     
     print("Computing the bovw histograms")
-    bovw_histograms = extract_bovw_histograms(descriptors=test_descriptors, bovw=bovw)
+    bovw_histograms = extract_bovw_histograms(kpts=test_kpts, descriptors=test_descriptors, bovw=bovw)
     
     print("predicting the values")
     y_pred = classifier.predict(bovw_histograms)
@@ -45,23 +47,25 @@ def test(dataset: List[Tuple[Type[Image.Image], int]]
 
 def train(dataset: List[Tuple[Type[Image.Image], int]],
            bovw:Type[BOVW]):
+    all_kpts = []
     all_descriptors = []
     all_labels = []
     
     for idx in tqdm.tqdm(range(len(dataset)), desc="Phase [Training]: Extracting the descriptors"):
         
         image, label = dataset[idx]
-        _, descriptors = bovw._extract_features(image=np.array(image))
+        kpts, descriptors = bovw._extract_features(image=np.array(image))
         
-        if descriptors  is not None:
+        if descriptors is not None:
+            all_kpts.append(kpts)
             all_descriptors.append(descriptors)
             all_labels.append(label)
             
     print("Fitting the codebook")
-    kmeans, cluster_centers = bovw._update_fit_codebook(descriptors=all_descriptors)
+    bovw._update_fit_codebook(descriptors=all_descriptors)
 
     print("Computing the bovw histograms")
-    bovw_histograms = extract_bovw_histograms(descriptors=all_descriptors, bovw=bovw) 
+    bovw_histograms = extract_bovw_histograms(kpts=all_kpts, descriptors=all_descriptors, bovw=bovw) 
     
     print("Fitting the classifier")
     classifier = LogisticRegression(class_weight="balanced").fit(bovw_histograms, all_labels)
