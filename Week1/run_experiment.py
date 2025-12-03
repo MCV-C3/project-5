@@ -26,9 +26,17 @@ def run_experiment():
     data_train = Dataset(ImageFolder=SPLIT_PATH + "train")
     data_test = Dataset(ImageFolder=SPLIT_PATH + "test")
 
+    det_kwargs = {}
+    if 'nfeatures' in cfg:
+        det_kwargs['nfeatures'] = cfg.nfeatures
+
+    cb_kwargs = {}
+    
     bovw = BOVW(
         detector_type=cfg.detector_type,
         codebook_size=cfg.codebook_size,
+        detector_kwargs=det_kwargs,
+        codebook_kwargs=cb_kwargs
     )
 
     print("Training the model...")
