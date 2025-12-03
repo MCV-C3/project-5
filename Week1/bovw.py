@@ -12,12 +12,21 @@ class BOVW():
     
     def __init__(self, detector_type="AKAZE", codebook_size:int=50, detector_kwargs:dict={}, codebook_kwargs:dict={}):
 
+        self.detector_type = detector_type
+
         if detector_type == 'SIFT':
             self.detector = cv2.SIFT_create(**detector_kwargs)
         elif detector_type == 'AKAZE':
             self.detector = cv2.AKAZE_create(**detector_kwargs)
         elif detector_type == 'ORB':
             self.detector = cv2.ORB_create(**detector_kwargs)
+        elif detector_type == 'DenseSIFT':
+            self.detector = cv2.SIFT_create(**detector_kwargs)
+
+            # Define keypoint extractor for dense sampling
+            stride = detector_kwargs.get('stride', 2)
+            scale = detector_kwargs.get('scale', 4)
+            self.kpts_extractor = (lambda im: [cv2.KeyPoint(x, y, scale) for y in range(0, im.shape[0], stride) for x in range(0, im.shape[1], stride)])
         else:
             raise ValueError("Detector type must be 'SIFT', 'SURF', or 'ORB'")
         
@@ -25,9 +34,11 @@ class BOVW():
         self.codebook_algo = MiniBatchKMeans(n_clusters=self.codebook_size, **codebook_kwargs)
         
                
-    ## Modify this function in order to be able to create a dense sift
+    ## Modified to create a dense sift if needed
     def _extract_features(self, image: Literal["H", "W", "C"]) -> Tuple:
-
+        if self.detector_type == 'DenseSIFT':
+            return self.detector.compute(image, self.kpts_extractor(image))
+        
         return self.detector.detectAndCompute(image, None)
     
     
