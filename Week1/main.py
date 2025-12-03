@@ -26,7 +26,7 @@ def test(dataset: List[Tuple[Type[Image.Image], int]]
     test_descriptors = []
     descriptors_labels = []
     
-    for idx in tqdm.tqdm(range(len(dataset)), desc="Phase [Eval]: Extracting the descriptors"):
+    for idx in tqdm.tqdm(range(len(dataset)), desc="Phase[Test]: Extracting the descriptors"):
         image, label = dataset[idx]
         kpts, descriptors = bovw._extract_features(image=np.array(image))
         
@@ -39,7 +39,7 @@ def test(dataset: List[Tuple[Type[Image.Image], int]]
     print("Computing the bovw histograms")
     bovw_histograms = extract_bovw_histograms(kpts=test_kpts, descriptors=test_descriptors, bovw=bovw)
     
-    print("predicting the values")
+    print("Predicting the values")
     y_pred = classifier.predict(bovw_histograms)
     
     print("Accuracy on Phase[Test]:", accuracy_score(y_true=descriptors_labels, y_pred=y_pred))
@@ -51,7 +51,7 @@ def train(dataset: List[Tuple[Type[Image.Image], int]],
     all_descriptors = []
     all_labels = []
     
-    for idx in tqdm.tqdm(range(len(dataset)), desc="Phase [Training]: Extracting the descriptors"):
+    for idx in tqdm.tqdm(range(len(dataset)), desc="Phase[Train]: Extracting the descriptors"):
         
         image, label = dataset[idx]
         kpts, descriptors = bovw._extract_features(image=np.array(image))
@@ -68,7 +68,7 @@ def train(dataset: List[Tuple[Type[Image.Image], int]],
     bovw_histograms = extract_bovw_histograms(kpts=all_kpts, descriptors=all_descriptors, bovw=bovw) 
     
     print("Fitting the classifier")
-    classifier = LogisticRegression(class_weight="balanced").fit(bovw_histograms, all_labels)
+    classifier = LogisticRegression(class_weight="balanced", max_iter=2000).fit(bovw_histograms, all_labels)
 
     print("Accuracy on Phase[Train]:", accuracy_score(y_true=all_labels, y_pred=classifier.predict(bovw_histograms)))
     
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     data_train = Dataset(ImageFolder=SPLIT_PATH+"train")
     data_test = Dataset(ImageFolder=SPLIT_PATH+"test") 
 
-    bovw = BOVW()
+    bovw = BOVW(detector_type="DenseSIFT", pyramid_lvls=3)
     
     bovw, classifier = train(dataset=data_train, bovw=bovw)
     

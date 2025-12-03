@@ -12,7 +12,7 @@ IMGS_SHAPE = (256, 256)
 
 class BOVW():
     
-    def __init__(self, detector_type="AKAZE", codebook_size:int=50, detector_kwargs:dict={}, codebook_kwargs:dict={}, pyramid_lvls:int=1):
+    def __init__(self, detector_type="AKAZE", codebook_size:int=500, detector_kwargs:dict={}, codebook_kwargs:dict={}, pyramid_lvls:int=1):
 
         self.detector_type = detector_type
 
@@ -26,8 +26,8 @@ class BOVW():
             self.detector = cv2.SIFT_create(**detector_kwargs)
 
             # Define keypoint extractor for dense sampling
-            stride = detector_kwargs.get('stride', 2)
-            scale = detector_kwargs.get('scale', 4)
+            stride = detector_kwargs.get('stride', 8)
+            scale = detector_kwargs.get('scale', 10)
             self.kpts_extractor = (lambda im: [cv2.KeyPoint(x, y, scale) for y in range(0, im.shape[0], stride) for x in range(0, im.shape[1], stride)])
         else:
             raise ValueError("Detector type must be 'SIFT', 'SURF', or 'ORB'")
