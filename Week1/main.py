@@ -18,6 +18,10 @@ def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"
     return np.array([bovw._compute_codebook_descriptor(descriptors=descriptor, kmeans=bovw.codebook_algo) for descriptor in descriptors])
 
 
+def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"]):
+    return np.array([bovw._compute_codebook_descriptor(descriptors=descriptor, kmeans=bovw.codebook_algo) for descriptor in descriptors])
+
+
 def test(dataset: List[Tuple[Type[Image.Image], int]]
          , bovw: Type[BOVW], 
          classifier:Type[object]):
@@ -39,8 +43,11 @@ def test(dataset: List[Tuple[Type[Image.Image], int]]
     
     print("predicting the values")
     y_pred = classifier.predict(bovw_histograms)
-
-    print("Accuracy on Phase[Test]:", accuracy_score(y_true=descriptors_labels, y_pred=y_pred))
+    
+    acc = accuracy_score(y_true=descriptors_labels, y_pred=y_pred)
+    print("Accuracy on Phase[Test]:", acc)
+    
+    return acc
 
 def train(dataset: List[Tuple[Type[Image.Image], int]],
            bovw:Type[BOVW]):
@@ -65,9 +72,10 @@ def train(dataset: List[Tuple[Type[Image.Image], int]],
     print("Fitting the classifier")
     classifier = LogisticRegression(class_weight="balanced").fit(bovw_histograms, all_labels)
 
-    print("Accuracy on Phase[Train]:", accuracy_score(y_true=all_labels, y_pred=classifier.predict(bovw_histograms)))
+    acc = accuracy_score(y_true=all_labels, y_pred=classifier.predict(bovw_histograms))
+    print("Accuracy on Phase[Train]:", acc)
     
-    return bovw, classifier
+    return bovw, classifier, acc
 
 
 def Dataset(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[Type[Image.Image], int]]:
@@ -103,16 +111,12 @@ def Dataset(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[Type[Image.Ima
 
     return dataset
 
-
-    
-
-
 if __name__ == "__main__":
     data_train = Dataset(ImageFolder=SPLIT_PATH+"train")
     data_test = Dataset(ImageFolder=SPLIT_PATH+"test") 
 
     bovw = BOVW(detector_type="SIFT", codebook_size=100)
     
-    bovw, classifier = train(dataset=data_train, bovw=bovw)
+    bovw, classifier, _ = train(dataset=data_train, bovw=bovw)
     
-    test(dataset=data_test, bovw=bovw, classifier=classifier)
+    _ = test(dataset=data_test, bovw=bovw, classifier=classifier)
