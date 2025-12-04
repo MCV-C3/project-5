@@ -66,8 +66,10 @@ def test(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], cache_f
     print("Predicting the values")
     y_pred = classifier.predict(bovw_histograms)
     
-    print("Accuracy on Phase[Test]:", accuracy_score(y_true=descriptors_labels, y_pred=y_pred))
+    acc = accuracy_score(y_true=descriptors_labels, y_pred=y_pred)
+    print("Accuracy on Phase[Test]:", acc)
     
+    return acc
 
 def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW], cache_file: str):
     
@@ -83,9 +85,10 @@ def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW], cache_f
     print("Fitting the classifier")
     classifier = LogisticRegression(class_weight="balanced", max_iter=2000).fit(bovw_histograms, all_labels)
 
-    print("Accuracy on Phase[Train]:", accuracy_score(y_true=all_labels, y_pred=classifier.predict(bovw_histograms)))
+    acc = accuracy_score(y_true=all_labels, y_pred=classifier.predict(bovw_histograms))
+    print("Accuracy on Phase[Train]:", acc)
     
-    return bovw, classifier
+    return bovw, classifier, acc
 
 
 def Dataset(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[Type[Image.Image], int]]:
@@ -121,16 +124,12 @@ def Dataset(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[Type[Image.Ima
 
     return dataset
 
-
-    
-
-
 if __name__ == "__main__":
     data_train = Dataset(ImageFolder=SPLIT_PATH+"train")
     data_test = Dataset(ImageFolder=SPLIT_PATH+"test") 
 
     bovw = BOVW()
     
-    bovw, classifier = train(dataset=data_train, bovw=bovw, cache_file="D-SIFT_train_cache.pkl")
+    bovw, classifier, _ = train(dataset=data_train, bovw=bovw, cache_file="D-SIFT_train_cache.pkl")
     
-    test(dataset=data_test, bovw=bovw, cache_file="D-SIFT_test_cache.pkl", classifier=classifier)
+    _ = test(dataset=data_test, bovw=bovw, cache_file="D-SIFT_test_cache.pkl", classifier=classifier)
