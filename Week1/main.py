@@ -13,7 +13,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 from sklearn.svm import SVC
 
-SPLIT_PATH = "../data/MIT_split/"
+SPLIT_PATH = "/home/bernat/MCV/C3/project/project-5/data/MIT_split/"
 
 
 def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"], kpts: Literal["N", "T"]):
@@ -23,9 +23,13 @@ def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOV
 
     # Try loading from cache to avoid recomputation
     if os.path.exists(cache_file):
+        
         print(f"Phase[{split}]: Loading descriptors from {cache_file}")
-        with open(cache_file, 'rb') as f:
-            data = pickle.load(f)
+        try:
+            with open(cache_file, 'rb') as f:
+                data = pickle.load(f)
+        except:
+            raise ValueError(f"Could not load cache file {cache_file}")
 
         all_kpts = data['kpts']
         all_descriptors = data['descriptors']
@@ -35,12 +39,12 @@ def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOV
         all_kpts = []
         all_descriptors = []
         all_labels = []
-        
+
         for idx in tqdm.tqdm(range(len(dataset)), desc=f"Phase[{split}]: Extracting the descriptors"):
-            
+
             image, label = dataset[idx]
             kpts, descriptors = bovw._extract_features(image=np.array(image))
-            
+
             if descriptors is not None:
                 all_kpts.append(kpts)
                 all_descriptors.append(descriptors)
@@ -57,27 +61,25 @@ def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOV
     return all_kpts, all_descriptors, all_labels
 
 
-def test(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], cache_file: str, classifier: Type[object]):
+def test(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], 
+          classifier: Type[object], cache_file: str=None):
     
     test_kpts, test_descriptors, descriptors_labels = get_descriptors(dataset, bovw, cache_file, split="Test")
     
     print("Computing the bovw histograms")
     bovw_histograms = extract_bovw_histograms(kpts=test_kpts, descriptors=test_descriptors, bovw=bovw)
-    
+
     print("Predicting the values")
     y_pred = classifier.predict(bovw_histograms)
-    
-    acc = accuracy_score(y_true=descriptors_labels, y_pred=y_pred)
-    print("Accuracy on Phase[Test]:", acc)
-    
-    return acc
+    y_probas = classifier.predict_proba(bovw_histograms)
 
-def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW], cache_file: str, 
-           classifier_algorithm: str = "LogisticRegression",
-           classifier_kwargs: dict={}):
-    
+    return y_pred, y_probas, descriptors_labels 
+
+def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW], 
+          classifier: Type[object], cache_file: str=None):
+
     all_kpts, all_descriptors, all_labels = get_descriptors(dataset, bovw, cache_file, split="Train")
-            
+
     print("Fitting the codebook", end=" ")
     dt = bovw._update_fit_codebook(descriptors=all_descriptors)
     print(f"(took {dt} seconds)")
@@ -86,15 +88,11 @@ def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW], cache_f
     bovw_histograms = extract_bovw_histograms(kpts=all_kpts, descriptors=all_descriptors, bovw=bovw) 
     
     print("Fitting the classifier")
-    if classifier_algorithm == 'LogisticRegression':
-        classifier = LogisticRegression(class_weight="balanced", **classifier_kwargs).fit(bovw_histograms, all_labels)
-    elif classifier_algorithm == 'SVM':
-        classifier = SVC(class_weight='balanced', **classifier_kwargs).fit(bovw_histograms, all_labels)
-
-    acc = accuracy_score(y_true=all_labels, y_pred=classifier.predict(bovw_histograms))
-    print("Accuracy on Phase[Train]:", acc)
+    classifier.fit(bovw_histograms, all_labels)
+    y_pred = classifier.predict(bovw_histograms)
+    y_probas = classifier.predict_proba(bovw_histograms)
     
-    return bovw, classifier, acc
+    return y_pred, y_probas, all_labels
 
 
 def Dataset(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[Type[Image.Image], int]]:
