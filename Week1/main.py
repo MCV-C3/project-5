@@ -13,7 +13,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 from sklearn.svm import SVC
 
-SPLIT_PATH = "/home/bernat/MCV/C3/project/project-5/data/MIT_split/"
+SPLIT_PATH = "../data/MIT_split/"
 
 
 def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"], kpts: Literal["N", "T"]):

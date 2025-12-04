@@ -18,11 +18,11 @@ def run_experiment():
 
     config_defaults = {
         "detector_type": "SIFT",
-        "cache_train":"/home/bernat/MCV/C3/project/project-5/Week1/cache_train_descriptor.pkl",
-        "cache_test":"/home/bernat/MCV/C3/project/project-5/Week1/cache_test_descriptor.pkl",
+        "cache_train":"./cache_train_descriptor.pkl",
+        "cache_test":"./cache_test_descriptor.pkl",
         "codebook_size": 50,
         "dataset_path": SPLIT_PATH,
-        "classifier_algorithm": "LogisticRegression",
+        "classifier_algorithm": "LogisticRegression",  # Options: 'LogisticRegression', 'SVM'
         "classifier_kwargs": {},
     }
 
@@ -44,7 +44,7 @@ def run_experiment():
     if cfg.classifier_algorithm == 'LogisticRegression':
         classifier = LogisticRegression(class_weight="balanced", **cfg.classifier_kwargs)
     elif cfg.classifier_algorithm == 'SVM':
-        classifier = SVC(class_weight="balanced", **cfg.classifier_kwargs)
+        classifier = SVC(class_weight="balanced", probability=True,**cfg.classifier_kwargs)
     
     
     det_kwargs = {}
