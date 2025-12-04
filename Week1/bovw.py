@@ -12,7 +12,7 @@ IMGS_SHAPE = (256, 256)
 
 class BOVW():
     
-    def __init__(self, detector_type="AKAZE", codebook_size:int=500, detector_kwargs:dict={}, codebook_kwargs:dict={}, pyramid_lvls:int=1):
+    def __init__(self, detector_type="AKAZE", codebook_size:int=500, detector_kwargs:dict={}, codebook_kwargs:dict={}, pyramid_lvls:int=1, normalize:bool=False):
 
         self.detector_type = detector_type
 
@@ -35,14 +35,18 @@ class BOVW():
         self.codebook_size = codebook_size
         self.codebook_algo = MiniBatchKMeans(n_clusters=self.codebook_size, **codebook_kwargs)
         self.pyramid_lvls = pyramid_lvls
+        self.normalize = normalize
         
                
     ## Modified to create a dense sift if needed
     def _extract_features(self, image: Literal["H", "W", "C"]) -> Tuple:
         if self.detector_type == 'DenseSIFT':
-            return self.detector.compute(image, self.kpts_extractor(image))
-        
-        return self.detector.detectAndCompute(image, None)
+            kpts, desc = self.detector.compute(image, self.kpts_extractor(image))
+        else:
+            kpts, desc = self.detector.detectAndCompute(image, None)
+    
+        # Kpts to NumPy array as (x,y)
+        return np.array([kp.pt for kp in kpts]), desc
     
     
     def _update_fit_codebook(self, descriptors: Literal["N", "T", "d"])-> Tuple[Type[MiniBatchKMeans],
@@ -56,10 +60,9 @@ class BOVW():
 
         visual_words = kmeans.predict(descriptors)
 
-        # Kpts to NumPy array
-        kpts_arr = np.array([kpt.pt for kpt in kpts])
-        x_coords = kpts_arr[:, 0]
-        y_coords = kpts_arr[:, 1]
+        # Kpts coordinates
+        x_coords = kpts[:, 0]
+        y_coords = kpts[:, 1]
 
         # Create descriptor with levels: 0 (1x1), 1 (2x2), 2 (4x4)...
         pyramid_descriptor = []
@@ -86,13 +89,16 @@ class BOVW():
                     for label in cell_words:
                         codebook_descriptor[label] += 1
                     
-                    # Normalize the histogram (optional)
-                    codebook_descriptor = codebook_descriptor / (np.linalg.norm(codebook_descriptor) + 1e-7)
-
                     # Append to pyramid descriptor
                     pyramid_descriptor.append(codebook_descriptor)
-        
-        return np.concatenate(pyramid_descriptor)
+
+        final_descriptor = np.concatenate(pyramid_descriptor)
+
+        # Normalize the histograms (optional)
+        if self.normalize:
+            final_descriptor /= (np.linalg.norm(final_descriptor) + 1e-7)
+
+        return final_descriptor
 
 
 def visualize_bow_histogram(histogram, image_index, output_folder="./test_example.jpg"):
