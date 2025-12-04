@@ -7,6 +7,7 @@ import numpy as np
 import glob
 import tqdm
 import os
+import pickle
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
@@ -17,24 +18,47 @@ SPLIT_PATH = "../data/MIT_split/"
 def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"], kpts: Literal["N", "T"]):
     return np.array([bovw._compute_codebook_descriptor(kpts=kpt, descriptors=descriptor, kmeans=bovw.codebook_algo) for kpt,descriptor in zip(kpts,descriptors)])
 
+def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], cache_file: str, split: str):
 
-def test(dataset: List[Tuple[Type[Image.Image], int]]
-         , bovw: Type[BOVW], 
-         classifier:Type[object]):
-    
-    test_kpts = []
-    test_descriptors = []
-    descriptors_labels = []
-    
-    for idx in tqdm.tqdm(range(len(dataset)), desc="Phase[Test]: Extracting the descriptors"):
-        image, label = dataset[idx]
-        kpts, descriptors = bovw._extract_features(image=np.array(image))
+    # Try loading from cache to avoid recomputation
+    if os.path.exists(cache_file):
+        print(f"Phase[{split}]: Loading descriptors from {cache_file}")
+        with open(cache_file, 'rb') as f:
+            data = pickle.load(f)
+
+        all_kpts = data['kpts']
+        all_descriptors = data['descriptors']
+        all_labels = data['labels']
+
+    else:
+        all_kpts = []
+        all_descriptors = []
+        all_labels = []
         
-        if descriptors is not None:
-            test_kpts.append(kpts)
-            test_descriptors.append(descriptors)
-            descriptors_labels.append(label)
+        for idx in tqdm.tqdm(range(len(dataset)), desc=f"Phase[{split}]: Extracting the descriptors"):
             
+            image, label = dataset[idx]
+            kpts, descriptors = bovw._extract_features(image=np.array(image))
+            
+            if descriptors is not None:
+                all_kpts.append(kpts)
+                all_descriptors.append(descriptors)
+                all_labels.append(label)
+        
+        print(f"Saving features to {cache_file}")
+        with open(cache_file, 'wb') as f:
+            pickle.dump({
+                'kpts': all_kpts,
+                'descriptors': all_descriptors,
+                'labels': all_labels
+            }, f)
+
+    return all_kpts, all_descriptors, all_labels
+
+
+def test(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], cache_file: str, classifier: Type[object]):
+    
+    test_kpts, test_descriptors, descriptors_labels = get_descriptors(dataset, bovw, cache_file, split="Test")
     
     print("Computing the bovw histograms")
     bovw_histograms = extract_bovw_histograms(kpts=test_kpts, descriptors=test_descriptors, bovw=bovw)
@@ -45,21 +69,9 @@ def test(dataset: List[Tuple[Type[Image.Image], int]]
     print("Accuracy on Phase[Test]:", accuracy_score(y_true=descriptors_labels, y_pred=y_pred))
     
 
-def train(dataset: List[Tuple[Type[Image.Image], int]],
-           bovw:Type[BOVW]):
-    all_kpts = []
-    all_descriptors = []
-    all_labels = []
+def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW], cache_file: str):
     
-    for idx in tqdm.tqdm(range(len(dataset)), desc="Phase[Train]: Extracting the descriptors"):
-        
-        image, label = dataset[idx]
-        kpts, descriptors = bovw._extract_features(image=np.array(image))
-        
-        if descriptors is not None:
-            all_kpts.append(kpts)
-            all_descriptors.append(descriptors)
-            all_labels.append(label)
+    all_kpts, all_descriptors, all_labels = get_descriptors(dataset, bovw, cache_file, split="Train")
             
     print("Fitting the codebook")
     bovw._update_fit_codebook(descriptors=all_descriptors)
@@ -116,8 +128,8 @@ if __name__ == "__main__":
     data_train = Dataset(ImageFolder=SPLIT_PATH+"train")
     data_test = Dataset(ImageFolder=SPLIT_PATH+"test") 
 
-    bovw = BOVW(detector_type="DenseSIFT", pyramid_lvls=3)
+    bovw = BOVW(detector_type="DenseSIFT", pyramid_lvls=2)
     
-    bovw, classifier = train(dataset=data_train, bovw=bovw)
+    bovw, classifier = train(dataset=data_train, bovw=bovw, cache_file="D-SIFT_train_cache.pkl")
     
-    test(dataset=data_test, bovw=bovw, classifier=classifier)
+    test(dataset=data_test, bovw=bovw, cache_file="D-SIFT_test_cache.pkl", classifier=classifier)
