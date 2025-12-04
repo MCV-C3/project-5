@@ -129,7 +129,7 @@ if __name__ == "__main__":
     data_train = Dataset(ImageFolder=SPLIT_PATH+"train")
     data_test = Dataset(ImageFolder=SPLIT_PATH+"test") 
 
-    bovw = BOVW(detector_type="DenseSIFT", pyramid_lvls=2, normalize=True)
+    bovw = BOVW()
     
     bovw, classifier = train(dataset=data_train, bovw=bovw, cache_file="D-SIFT_train_cache.pkl")
     
