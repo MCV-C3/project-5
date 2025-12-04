@@ -7,6 +7,7 @@ import numpy as np
 import glob
 import tqdm
 import os
+import pickle
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
@@ -15,30 +16,55 @@ from sklearn.svm import SVC
 SPLIT_PATH = "../data/MIT_split/"
 
 
-def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"]):
-    return np.array([bovw._compute_codebook_descriptor(descriptors=descriptor, kmeans=bovw.codebook_algo) for descriptor in descriptors])
+def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"], kpts: Literal["N", "T"]):
+    return np.array([bovw._compute_codebook_descriptor(kpts=kpt, descriptors=descriptor, kmeans=bovw.codebook_algo) for kpt,descriptor in zip(kpts,descriptors)])
 
+def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], cache_file: str, split: str):
 
-def test(dataset: List[Tuple[Type[Image.Image], int]]
-         , bovw: Type[BOVW], 
-         classifier:Type[object]):
-    
-    test_descriptors = []
-    descriptors_labels = []
-    
-    for idx in tqdm.tqdm(range(len(dataset)), desc="Phase [Eval]: Extracting the descriptors"):
-        image, label = dataset[idx]
-        _, descriptors = bovw._extract_features(image=np.array(image))
+    # Try loading from cache to avoid recomputation
+    if os.path.exists(cache_file):
+        print(f"Phase[{split}]: Loading descriptors from {cache_file}")
+        with open(cache_file, 'rb') as f:
+            data = pickle.load(f)
+
+        all_kpts = data['kpts']
+        all_descriptors = data['descriptors']
+        all_labels = data['labels']
+
+    else:
+        all_kpts = []
+        all_descriptors = []
+        all_labels = []
         
-        if descriptors is not None:
-            test_descriptors.append(descriptors)
-            descriptors_labels.append(label)
+        for idx in tqdm.tqdm(range(len(dataset)), desc=f"Phase[{split}]: Extracting the descriptors"):
             
+            image, label = dataset[idx]
+            kpts, descriptors = bovw._extract_features(image=np.array(image))
+            
+            if descriptors is not None:
+                all_kpts.append(kpts)
+                all_descriptors.append(descriptors)
+                all_labels.append(label)
+        
+        print(f"Saving features to {cache_file}")
+        with open(cache_file, 'wb') as f:
+            pickle.dump({
+                'kpts': all_kpts,
+                'descriptors': all_descriptors,
+                'labels': all_labels
+            }, f)
+
+    return all_kpts, all_descriptors, all_labels
+
+
+def test(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], cache_file: str, classifier: Type[object]):
+    
+    test_kpts, test_descriptors, descriptors_labels = get_descriptors(dataset, bovw, cache_file, split="Test")
     
     print("Computing the bovw histograms")
-    bovw_histograms = extract_bovw_histograms(descriptors=test_descriptors, bovw=bovw)
+    bovw_histograms = extract_bovw_histograms(kpts=test_kpts, descriptors=test_descriptors, bovw=bovw)
     
-    print("predicting the values")
+    print("Predicting the values")
     y_pred = classifier.predict(bovw_histograms)
     
     acc = accuracy_score(y_true=descriptors_labels, y_pred=y_pred)
@@ -46,28 +72,18 @@ def test(dataset: List[Tuple[Type[Image.Image], int]]
     
     return acc
 
-def train(dataset: List[Tuple[Type[Image.Image], int]],
-           bovw:Type[BOVW], 
-           classifier_algorithm:str = "LogisticRegression",
-           classifier_kwargs:dict={}):
+def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW], cache_file: str, 
+           classifier_algorithm: str = "LogisticRegression",
+           classifier_kwargs: dict={}):
     
-    all_descriptors = []
-    all_labels = []
-    
-    for idx in tqdm.tqdm(range(len(dataset)), desc="Phase [Training]: Extracting the descriptors"):
-        
-        image, label = dataset[idx]
-        _, descriptors = bovw._extract_features(image=np.array(image))
-        
-        if descriptors  is not None:
-            all_descriptors.append(descriptors)
-            all_labels.append(label)
+    all_kpts, all_descriptors, all_labels = get_descriptors(dataset, bovw, cache_file, split="Train")
             
-    print("Fitting the codebook")
-    kmeans, cluster_centers = bovw._update_fit_codebook(descriptors=all_descriptors)
+    print("Fitting the codebook", end=" ")
+    dt = bovw._update_fit_codebook(descriptors=all_descriptors)
+    print(f"(took {dt} seconds)")
 
     print("Computing the bovw histograms")
-    bovw_histograms = extract_bovw_histograms(descriptors=all_descriptors, bovw=bovw) 
+    bovw_histograms = extract_bovw_histograms(kpts=all_kpts, descriptors=all_descriptors, bovw=bovw) 
     
     print("Fitting the classifier")
     if classifier_algorithm == 'LogisticRegression':
@@ -118,8 +134,8 @@ if __name__ == "__main__":
     data_train = Dataset(ImageFolder=SPLIT_PATH+"train")
     data_test = Dataset(ImageFolder=SPLIT_PATH+"test") 
 
-    bovw = BOVW(detector_type="SIFT", codebook_size=100)
+    bovw = BOVW()
     
-    bovw, classifier, _ = train(dataset=data_train, bovw=bovw)
+    bovw, classifier, _ = train(dataset=data_train, bovw=bovw, cache_file="D-SIFT_train_cache.pkl")
     
-    _ = test(dataset=data_test, bovw=bovw, classifier=classifier)
+    _ = test(dataset=data_test, bovw=bovw, cache_file="D-SIFT_test_cache.pkl", classifier=classifier)
