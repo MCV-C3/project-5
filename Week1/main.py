@@ -10,12 +10,9 @@ import os
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
+from sklearn.svm import SVC
 
 SPLIT_PATH = "../data/MIT_split/"
-
-
-def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"]):
-    return np.array([bovw._compute_codebook_descriptor(descriptors=descriptor, kmeans=bovw.codebook_algo) for descriptor in descriptors])
 
 
 def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"]):
@@ -50,7 +47,10 @@ def test(dataset: List[Tuple[Type[Image.Image], int]]
     return acc
 
 def train(dataset: List[Tuple[Type[Image.Image], int]],
-           bovw:Type[BOVW]):
+           bovw:Type[BOVW], 
+           classifier_algorithm:str = "LogisticRegression",
+           classifier_kwargs:dict={}):
+    
     all_descriptors = []
     all_labels = []
     
@@ -70,7 +70,10 @@ def train(dataset: List[Tuple[Type[Image.Image], int]],
     bovw_histograms = extract_bovw_histograms(descriptors=all_descriptors, bovw=bovw) 
     
     print("Fitting the classifier")
-    classifier = LogisticRegression(class_weight="balanced").fit(bovw_histograms, all_labels)
+    if classifier_algorithm == 'LogisticRegression':
+        classifier = LogisticRegression(class_weight="balanced", **classifier_kwargs).fit(bovw_histograms, all_labels)
+    elif classifier_algorithm == 'SVM':
+        classifier = SVC(class_weight='balanced', **classifier_kwargs).fit(bovw_histograms, all_labels)
 
     acc = accuracy_score(y_true=all_labels, y_pred=classifier.predict(bovw_histograms))
     print("Accuracy on Phase[Train]:", acc)

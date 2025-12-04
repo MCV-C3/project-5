@@ -2,6 +2,6 @@
 
 ## Group 5 Members
 - Diego Hernández Antón
-- Pau Montserrat Llabrés
+- Pau Monserrat Llabrés
 - Bernat Medina Pérez
 - Marc Artero Pons
