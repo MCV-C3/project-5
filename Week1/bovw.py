@@ -11,12 +11,12 @@ from typing import *
 class BOVW():
     
     def __init__(self, detector_type="AKAZE", codebook_size:int=50, detector_kwargs:dict={}, codebook_kwargs:dict={}):
-
-        if detector_type == 'SIFT':
+        self.detector_type = detector_type
+        if self.detector_type == 'SIFT' or self.detector_type == 'DENSE_SIFT':
             self.detector = cv2.SIFT_create(**detector_kwargs)
-        elif detector_type == 'AKAZE':
+        elif self.detector_type == 'AKAZE':
             self.detector = cv2.AKAZE_create(**detector_kwargs)
-        elif detector_type == 'ORB':
+        elif self.detector_type == 'ORB':
             self.detector = cv2.ORB_create(**detector_kwargs)
         else:
             raise ValueError("Detector type must be 'SIFT', 'SURF', or 'ORB'")
@@ -26,14 +26,40 @@ class BOVW():
         
                
     ## Modify this function in order to be able to create a dense sift
-    def _extract_features(self, image: Literal["H", "W", "C"]) -> Tuple:
-
-        return self.detector.detectAndCompute(image, None)
+    def _extract_features(self, 
+                          image: Literal["H", "W", "C"],
+                          step_size: int = 16,
+                          feature_scale: int = 16) -> Tuple:
+        if self.detector_type == 'DENSE_SIFT':
+            keypoints = []
+            if image is None or image.ndim < 2:
+                return [], np.array([])
+                
+            h, w = image.shape[:2]
+            
+            X_coords = np.arange(0, w, step_size)
+            Y_coords = np.arange(0, h, step_size)
+            
+            X, Y = np.meshgrid(X_coords, Y_coords)
+            
+            X_flat = X.ravel()
+            Y_flat = Y.ravel()
+            
+            keypoints = [
+                cv2.KeyPoint(x, y, feature_scale) 
+                for x, y in zip(X_flat.astype(float), Y_flat.astype(float))
+            ]
+            _, descriptors = self.detector.compute(image, keypoints)
+            
+            return keypoints, descriptors
+            
+        else:
+            return self.detector.detectAndCompute(image, None)
     
     
     def _update_fit_codebook(self, descriptors: Literal["N", "T", "d"])-> Tuple[Type[MiniBatchKMeans],
                                                                                Literal["codebook_size", "d"]]:
-        
+
         all_descriptors = np.vstack(descriptors)
 
         self.codebook_algo = self.codebook_algo.partial_fit(X=all_descriptors)
