@@ -73,8 +73,9 @@ def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW], cache_f
     
     all_kpts, all_descriptors, all_labels = get_descriptors(dataset, bovw, cache_file, split="Train")
             
-    print("Fitting the codebook")
-    bovw._update_fit_codebook(descriptors=all_descriptors)
+    print("Fitting the codebook", end=" ")
+    dt = bovw._update_fit_codebook(descriptors=all_descriptors)
+    print(f"(took {dt} seconds)")
 
     print("Computing the bovw histograms")
     bovw_histograms = extract_bovw_histograms(kpts=all_kpts, descriptors=all_descriptors, bovw=bovw) 
@@ -128,7 +129,7 @@ if __name__ == "__main__":
     data_train = Dataset(ImageFolder=SPLIT_PATH+"train")
     data_test = Dataset(ImageFolder=SPLIT_PATH+"test") 
 
-    bovw = BOVW(detector_type="DenseSIFT", pyramid_lvls=2)
+    bovw = BOVW(detector_type="DenseSIFT", pyramid_lvls=2, normalize=True)
     
     bovw, classifier = train(dataset=data_train, bovw=bovw, cache_file="D-SIFT_train_cache.pkl")
     

@@ -3,16 +3,23 @@ import numpy as np
 from sklearn.cluster import KMeans, MiniBatchKMeans
 import matplotlib.pyplot as plt
 import os
-import glob
-
+from sklearn.decomposition import PCA
+import time
 
 from typing import *
 
 IMGS_SHAPE = (256, 256)
 
-class BOVW():
+class EmptyTransform():
+    def fit_transform(self, X):
+        return X
     
-    def __init__(self, detector_type="AKAZE", codebook_size:int=500, detector_kwargs:dict={}, codebook_kwargs:dict={}, pyramid_lvls:int=1, normalize:bool=False):
+    def transform(self, X):
+        return X
+
+class BOVW():
+
+    def __init__(self, detector_type="AKAZE", codebook_size:int=500, detector_kwargs:dict={}, codebook_kwargs:dict={}, pyramid_lvls:int=1, normalize:bool=False, use_pca:bool=False, n_pca:int=64):
 
         self.detector_type = detector_type
 
@@ -36,6 +43,7 @@ class BOVW():
         self.codebook_algo = MiniBatchKMeans(n_clusters=self.codebook_size, **codebook_kwargs)
         self.pyramid_lvls = pyramid_lvls
         self.normalize = normalize
+        self.reduction_algo = PCA(n_components=n_pca) if use_pca else EmptyTransform()
         
                
     ## Modified to create a dense sift if needed
@@ -49,14 +57,23 @@ class BOVW():
         return np.array([kp.pt for kp in kpts]), desc
     
     
-    def _update_fit_codebook(self, descriptors: Literal["N", "T", "d"])-> Tuple[Type[MiniBatchKMeans],
-                                                                               Literal["codebook_size", "d"]]:
+    def _update_fit_codebook(self, descriptors: Literal["N", "T", "d"]) -> str:
         
         all_descriptors = np.vstack(descriptors)
-        self.codebook_algo = self.codebook_algo.partial_fit(X=all_descriptors)
+
+        # Dimensionality reduction before clustering
+        all_descriptors = self.reduction_algo.fit_transform(all_descriptors)
+
+        # K-Means clustering for codebook
+        start = time.time()
+        self.codebook_algo.partial_fit(X=all_descriptors)
+        end = time.time()
+        return f"{end - start:.2f}"
     
 
     def _compute_codebook_descriptor(self, kpts: Literal["1 T"], descriptors: Literal["1 T d"], kmeans: Type[KMeans]) -> np.ndarray:
+        # Dimenstionality reduction before clustering
+        descriptors = self.reduction_algo.transform(descriptors)
 
         visual_words = kmeans.predict(descriptors)
 
