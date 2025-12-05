@@ -23,8 +23,8 @@ def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"
 def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], cache_file: str, split: str):
 
     # Try loading from cache to avoid recomputation
-    if os.path.exists(cache_file):
-        
+    #if os.path.exists(cache_file):
+    if False:    
         print(f"Phase[{split}]: Loading descriptors from {cache_file}")
         try:
             with open(cache_file, 'rb') as f:

@@ -4,6 +4,7 @@ from main import train, test, TrainDataset, TestDataset
 from bovw import BOVW
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -41,18 +42,15 @@ def run_experiment():
     elif cfg.classifier_algorithm == 'SVM':
         classifier = SVC(class_weight="balanced", probability=True,**cfg.classifier_kwargs)
     
-    
-    det_kwargs = {}
-    if 'nfeatures' in cfg:
-        det_kwargs['nfeatures'] = cfg.nfeatures
-
-    cb_kwargs = {}
-    
     bovw = BOVW(
         detector_type=cfg.detector_type,
         codebook_size=cfg.codebook_size,
-        detector_kwargs=det_kwargs,
-        codebook_kwargs=cb_kwargs
+        detector_kwargs=cfg.detector_kwargs,
+        codebook_kwargs=cfg.codebook_kwargs,
+        pyramid_lvls=cfg.pyramid_lvls,
+        normalize=cfg.normalize_histograms,
+        use_pca=cfg.use_pca,
+        n_pca=cfg.n_pca
     )
     
 

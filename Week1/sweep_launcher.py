@@ -5,13 +5,40 @@ sweep_config = {
     'method': 'grid',
     'parameters': {
         'detector_type': {
-            'values': ['SIFT', 'ORB']
+            'values': ['SIFT', 'ORB', 'AKAZE', 'DenseSIFT']
+        },
+        'detector_kwargs':{
+            'values': [
+                #{'nfeatures': 10}
+                {}
+            ]  
+        },
+        'codebook_kwargs':{
+            'values': [{}]  
+        },
+        'pyramid_lvls':{
+            'values': [1]    
         },
         'codebook_size': {
-            'values': [10, 20, 30]
+            'values': [50]
         },
-        'nfeatures': {
-            'values': [10]
+        'normalize_histograms':{
+            'values': [True]    
+        },
+        'use_pca':{
+            'values': [False]    
+        },
+        'n_pca':{
+            'values': [64]    
+        },
+        'classifier_algorithm':{
+            'values': ['SVM']
+        },
+        'classifier_kwargs':{
+            'values': [
+                {'C': 1,
+                'kernel': 'linear'}
+            ]
         }
     },
     'metric': {
