@@ -8,11 +8,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
-# metrics 
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    confusion_matrix, roc_auc_score, roc_curve, ConfusionMatrixDisplay,
-)
+from metrics import MetricsComputer
 
 def run_experiment():
 
@@ -83,72 +79,92 @@ def run_experiment():
     # METRICS CALCULATION
     ##################################
     
-    classes = np.unique(labels_test)
-    n_classes = len(classes)
+    metrics = MetricsComputer(y_pred_train, y_pred_test, 
+                                   labels_train, labels_test,
+                                   y_probas_train, y_probas_test)
     
-    # ---- Precision / Recall / F1 ----
-    precision_macro = precision_score(labels_test, y_pred_test, average="macro")
-    recall_macro = recall_score(labels_test, y_pred_test, average="macro")
-    f1_macro = f1_score(labels_test, y_pred_test, average="macro")
-
-    precision_per_class = precision_score(labels_test, y_pred_test, average=None)
-    recall_per_class = recall_score(labels_test, y_pred_test, average=None)
-    f1_per_class = f1_score(labels_test, y_pred_test, average=None)
-
-    # ---- Confusion Matrix ----
-    cm = confusion_matrix(labels_test, y_pred_test)
-    fig_cm, ax = plt.subplots(figsize=(6, 6))
-    ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=classes).plot(ax=ax)
-    ax.set_title("Confusion Matrix")
-    wandb.log({"confusion_matrix": wandb.Image(fig_cm)})
-    plt.close(fig_cm)
-
-    # ---- ROC Curve + AUC ----
-    y_test_bin = np.zeros((len(labels_test), n_classes))
-    for i, c in enumerate(classes):
-        y_test_bin[:, i] = (labels_test == c).astype(int)
-
-    auc_per_class = {}
-    fig_roc, ax_roc = plt.subplots(figsize=(7, 7))
-
-    for i, c in enumerate(classes):
-        fpr, tpr, _ = roc_curve(y_test_bin[:, i], y_probas_test[:, i])
-        auc = roc_auc_score(y_test_bin[:, i], y_probas_test[:, i])
-        auc_per_class[str(c)] = float(auc)
-        ax_roc.plot(fpr, tpr, label=f"Class {c} (AUC={auc:.3f})")
-
-    ax_roc.plot([0, 1], [0, 1], "--")
-    ax_roc.set_xlabel("False Positive Rate")
-    ax_roc.set_ylabel("True Positive Rate")
-    ax_roc.set_title("ROC Curve (One-vs-Rest)")
-    ax_roc.legend()
-
-    wandb.log({"ROC_curve": wandb.Image(fig_roc)})
-    plt.close(fig_roc)
-
-    # ---- AUC aggregated ----
-    auc_macro = roc_auc_score(y_test_bin, y_probas_test, average="macro", multi_class="ovr")
-    auc_weighted = roc_auc_score(y_test_bin, y_probas_test, average="weighted", multi_class="ovr")
+    # BASIC METRICS (PRECISION, RECALL, F1, ACCURACY, AUC)
+    metrics.compute_all_metrics()
+    metrics_dict = metrics.get_all_metrics_dict()
+    wandb.log(metrics_dict)
+    
+    #CONFMAT
+    confmat_fig = metrics.plot_confusion_matrix()
+    wandb.log({"confusion_matrix": wandb.Image(confmat_fig)})
+    plt.close(confmat_fig)
+    
+    # ROC CURVE
+    roc_fig = metrics.plot_roc_curve()
+    wandb.log({"ROC_curve": wandb.Image(roc_fig)})
+    plt.close(roc_fig)
+    
 
     
     
-    wandb.log({
-        # basic metrics
-        "test_accuracy": float(test_acc),
-        "precision_macro": float(precision_macro),
-        "recall_macro": float(recall_macro),
-        "f1_macro": float(f1_macro),
+    
+    # # ---- Precision / Recall / F1 ----
+    # precision_macro = precision_score(labels_test, y_pred_test, average="macro")
+    # recall_macro = recall_score(labels_test, y_pred_test, average="macro")
+    # f1_macro = f1_score(labels_test, y_pred_test, average="macro")
 
-        # per class
-        "precision_per_class": {str(c): precision_per_class[i] for i, c in enumerate(classes)},
-        "recall_per_class": {str(c): recall_per_class[i] for i, c in enumerate(classes)},
-        "f1_per_class": {str(c): f1_per_class[i] for i, c in enumerate(classes)},
+    # precision_per_class = precision_score(labels_test, y_pred_test, average=None)
+    # recall_per_class = recall_score(labels_test, y_pred_test, average=None)
+    # f1_per_class = f1_score(labels_test, y_pred_test, average=None)
 
-        # auc
-        "AUC_macro": float(auc_macro),
-        "AUC_weighted": float(auc_weighted),
-        "AUC_per_class": auc_per_class,
-    })
+    # # ---- Confusion Matrix ----
+    # cm = confusion_matrix(labels_test, y_pred_test)
+    # fig_cm, ax = plt.subplots(figsize=(6, 6))
+    # ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=classes).plot(ax=ax)
+    # ax.set_title("Confusion Matrix")
+    # wandb.log({"confusion_matrix": wandb.Image(fig_cm)})
+    # plt.close(fig_cm)
+
+    # # ---- ROC Curve + AUC ----
+    # y_test_bin = np.zeros((len(labels_test), n_classes))
+    # for i, c in enumerate(classes):
+    #     y_test_bin[:, i] = (labels_test == c).astype(int)
+
+    # auc_per_class = {}
+    # fig_roc, ax_roc = plt.subplots(figsize=(7, 7))
+
+    # for i, c in enumerate(classes):
+    #     fpr, tpr, _ = roc_curve(y_test_bin[:, i], y_probas_test[:, i])
+    #     auc = roc_auc_score(y_test_bin[:, i], y_probas_test[:, i])
+    #     auc_per_class[str(c)] = float(auc)
+    #     ax_roc.plot(fpr, tpr, label=f"Class {c} (AUC={auc:.3f})")
+
+    # ax_roc.plot([0, 1], [0, 1], "--")
+    # ax_roc.set_xlabel("False Positive Rate")
+    # ax_roc.set_ylabel("True Positive Rate")
+    # ax_roc.set_title("ROC Curve (One-vs-Rest)")
+    # ax_roc.legend()
+
+    # wandb.log({"ROC_curve": wandb.Image(fig_roc)})
+    # plt.close(fig_roc)
+
+    # # ---- AUC aggregated ----
+    # auc_macro = roc_auc_score(y_test_bin, y_probas_test, average="macro", multi_class="ovr")
+    # auc_weighted = roc_auc_score(y_test_bin, y_probas_test, average="weighted", multi_class="ovr")
+
+    
+    
+    # wandb.log({
+    #     # basic metrics
+    #     "test_accuracy": float(test_acc),
+    #     "precision_macro": float(precision_macro),
+    #     "recall_macro": float(recall_macro),
+    #     "f1_macro": float(f1_macro),
+
+    #     # per class
+    #     "precision_per_class": {str(c): precision_per_class[i] for i, c in enumerate(classes)},
+    #     "recall_per_class": {str(c): recall_per_class[i] for i, c in enumerate(classes)},
+    #     "f1_per_class": {str(c): f1_per_class[i] for i, c in enumerate(classes)},
+
+    #     # auc
+    #     "AUC_macro": float(auc_macro),
+    #     "AUC_weighted": float(auc_weighted),
+    #     "AUC_per_class": auc_per_class,
+    # })
 
     print(f"Experiment completed. Train Acc: {train_acc}, Test Acc: {test_acc}")
 
