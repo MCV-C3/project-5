@@ -52,6 +52,8 @@ def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOV
                 all_labels.append(label)
         
         print(f"Saving features to {cache_file}")
+        os.makedirs("./cache_test", exist_ok=True)
+        os.makedirs("./cache_train", exist_ok=True)
         with open(cache_file, 'wb') as f:
             pickle.dump({
                 'kpts': all_kpts,
