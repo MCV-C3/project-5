@@ -142,7 +142,14 @@ if __name__ == "__main__":
     data_test = TestDataset()
 
     bovw = BOVW()
+    classifier = LogisticRegression(class_weight="balanced")
     
-    bovw, classifier, _ = train(dataset=data_train, bovw=bovw, cache_file="D-SIFT_train_cache.pkl")
+    y_pred_train, _, all_labels = train(dataset=data_train, bovw=bovw, classifier=classifier, cache_file="D-SIFT_train_cache.pkl")
     
-    _ = test(dataset=data_test, bovw=bovw, cache_file="D-SIFT_test_cache.pkl", classifier=classifier)
+    acc_train = accuracy_score(y_true=all_labels, y_pred=y_pred_train)
+    print(f"Accuracy on Phase[Train]: {acc_train:.4f}")
+
+    y_pred_test, y_probas, descriptors_labels = test(dataset=data_test, bovw=bovw, classifier=classifier, cache_file="D-SIFT_test_cache.pkl")
+
+    acc_test = accuracy_score(y_true=descriptors_labels, y_pred=y_pred_test)
+    print(f"Accuracy on Phase[Test]: {acc_test:.4f}")
