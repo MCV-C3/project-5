@@ -46,6 +46,7 @@ def test(dataset: List[Tuple[Type[Image.Image], int]]
     
     return acc
 
+
 def train(dataset: List[Tuple[Type[Image.Image], int]],
            bovw:Type[BOVW], 
            classifier_algorithm:str = "LogisticRegression",
