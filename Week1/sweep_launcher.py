@@ -20,7 +20,7 @@ sweep_config = {
             'values': [1]    
         },
         'codebook_size': {
-            'values': [50]
+            'values': [200]
         },
         'normalize_histograms':{
             'values': [True]    
@@ -37,7 +37,7 @@ sweep_config = {
         'classifier_kwargs':{
             'values': [
                 {'C': 1,
-                'kernel': 'linear'}
+                'kernel': 'rbf'}
             ]
         }
     },

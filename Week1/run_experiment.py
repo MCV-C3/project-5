@@ -15,8 +15,8 @@ def run_experiment():
 
     config_defaults = {
         "detector_type": "SIFT",
-        "cache_train":"./cache_train_descriptor.pkl",
-        "cache_test":"./cache_test_descriptor.pkl",
+        #"cache_train":"./cache_train_descriptor.pkl",
+        #"cache_test":"./cache_test_descriptor.pkl",
         "codebook_size": 50,
         "classifier_algorithm": "LogisticRegression",  # Options: 'LogisticRegression', 'SVM'
         "classifier_kwargs": {},
@@ -53,12 +53,17 @@ def run_experiment():
         n_pca=cfg.n_pca
     )
     
-
-
+    # Compute cache paths
+    kwarg_detector_str = [f"_{str(key)}-{str(value)}" for key, value in cfg.detector_kwargs]
+    kwarg_detector_str = "".join(kwarg_detector_str)
+    cache_file_train = "./cache_train/"+cfg.detector_type+kwarg_detector_str
+    cache_file_test = "./cache_test/"+cfg.detector_type+kwarg_detector_str
+    
     print("Training the model...")
+    
     y_pred_train, y_probas_train, labels_train = train(dataset=data_train, bovw=bovw, 
                                                        classifier=classifier, 
-                                                       cache_file=cfg.cache_train)
+                                                       cache_file=cache_file_train)
 
     train_acc = accuracy_score(y_true=labels_train, y_pred=y_pred_train)
 
@@ -68,7 +73,7 @@ def run_experiment():
     print("Evaluating the model...")
     y_pred_test, y_probas_test, labels_test = test(dataset=data_test, bovw=bovw, 
                                                    classifier=classifier,
-                                                       cache_file=cfg.cache_test)
+                                                       cache_file=cache_file_test)
 
     test_acc = accuracy_score(y_true=labels_test, y_pred=y_pred_test)
     
