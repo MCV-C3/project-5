@@ -12,7 +12,7 @@ sweep_config = {
         },
         'nfeatures': {
             'values': [10]
-    }
+        }
     },
     'metric': {
         'name': 'test_accuracy',

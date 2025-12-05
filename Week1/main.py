@@ -10,6 +10,7 @@ import os
 import pickle
 
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_predict
 from sklearn.metrics import accuracy_score
 from sklearn.svm import SVC
 
@@ -76,7 +77,7 @@ def test(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW],
     return y_pred, y_probas, descriptors_labels 
 
 def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW], 
-          classifier: Type[object], cache_file: str=None):
+          classifier: Type[object], k_folds: int=5, cache_file: str=None):
 
     all_kpts, all_descriptors, all_labels = get_descriptors(dataset, bovw, cache_file, split="Train")
 
@@ -88,9 +89,27 @@ def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW],
     bovw_histograms = extract_bovw_histograms(kpts=all_kpts, descriptors=all_descriptors, bovw=bovw) 
     
     print("Fitting the classifier")
+    
+    # Obtain the predictions and probabilities of the train set using cross-validation
+    y_pred = cross_val_predict(
+        estimator=classifier,
+        X=bovw_histograms,
+        y=all_labels,
+        cv=k_folds,
+        n_jobs=-1
+    )
+    y_probas = cross_val_predict(
+        estimator=classifier,
+        X=bovw_histograms, 
+        y=all_labels, 
+        cv=k_folds, 
+        method='predict_proba',
+        n_jobs=-1
+    )
+    
     classifier.fit(bovw_histograms, all_labels)
-    y_pred = classifier.predict(bovw_histograms)
-    y_probas = classifier.predict_proba(bovw_histograms)
+    #y_pred = classifier.predict(bovw_histograms)
+    #y_probas = classifier.predict_proba(bovw_histograms)
     
     return y_pred, y_probas, all_labels
 
