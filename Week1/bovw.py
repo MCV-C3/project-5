@@ -3,14 +3,23 @@ import numpy as np
 from sklearn.cluster import KMeans, MiniBatchKMeans
 import matplotlib.pyplot as plt
 import os
-import glob
-
+from sklearn.decomposition import PCA
+import time
 
 from typing import *
 
-class BOVW():
+IMGS_SHAPE = (256, 256)
+
+class EmptyTransform():
+    def fit_transform(self, X):
+        return X
     
-    def __init__(self, detector_type="AKAZE", codebook_size:int=50, detector_kwargs:dict={}, codebook_kwargs:dict={}):
+    def transform(self, X):
+        return X
+
+class BOVW():
+
+    def __init__(self, detector_type="DenseSIFT", codebook_size:int=500, detector_kwargs:dict={}, codebook_kwargs:dict={}, pyramid_lvls:int=1, normalize:bool=True, use_pca:bool=False, n_pca:int=64):
 
         self.detector_type = detector_type
 
@@ -24,50 +33,89 @@ class BOVW():
             self.detector = cv2.SIFT_create(**detector_kwargs)
 
             # Define keypoint extractor for dense sampling
-            stride = detector_kwargs.get('stride', 2)
-            scale = detector_kwargs.get('scale', 4)
+            stride = detector_kwargs.get('stride', 8)
+            scale = detector_kwargs.get('scale', 2)
             self.kpts_extractor = (lambda im: [cv2.KeyPoint(x, y, scale) for y in range(0, im.shape[0], stride) for x in range(0, im.shape[1], stride)])
         else:
             raise ValueError("Detector type must be 'SIFT', 'SURF', or 'ORB'")
         
         self.codebook_size = codebook_size
         self.codebook_algo = MiniBatchKMeans(n_clusters=self.codebook_size, **codebook_kwargs)
+        self.pyramid_lvls = pyramid_lvls
+        self.normalize = normalize
+        self.reduction_algo = PCA(n_components=n_pca) if use_pca else EmptyTransform()
         
                
     ## Modified to create a dense sift if needed
     def _extract_features(self, image: Literal["H", "W", "C"]) -> Tuple:
         if self.detector_type == 'DenseSIFT':
-            return self.detector.compute(image, self.kpts_extractor(image))
-        
-        return self.detector.detectAndCompute(image, None)
+            kpts, desc = self.detector.compute(image, self.kpts_extractor(image))
+        else:
+            kpts, desc = self.detector.detectAndCompute(image, None)
+    
+        # Kpts to NumPy array as (x,y)
+        return np.array([kp.pt for kp in kpts]), desc
     
     
-    def _update_fit_codebook(self, descriptors: Literal["N", "T", "d"])-> Tuple[Type[MiniBatchKMeans],
-                                                                               Literal["codebook_size", "d"]]:
+    def _update_fit_codebook(self, descriptors: Literal["N", "T", "d"]) -> str:
         
         all_descriptors = np.vstack(descriptors)
 
-        self.codebook_algo = self.codebook_algo.partial_fit(X=all_descriptors)
+        # Dimensionality reduction before clustering
+        all_descriptors = self.reduction_algo.fit_transform(all_descriptors)
 
-        return self.codebook_algo, self.codebook_algo.cluster_centers_
+        # K-Means clustering for codebook
+        start = time.time()
+        self.codebook_algo.partial_fit(X=all_descriptors)
+        end = time.time()
+        return f"{end - start:.2f}"
     
-    def _compute_codebook_descriptor(self, descriptors: Literal["1 T d"], kmeans: Type[KMeans]) -> np.ndarray:
+
+    def _compute_codebook_descriptor(self, kpts: Literal["1 T"], descriptors: Literal["1 T d"], kmeans: Type[KMeans]) -> np.ndarray:
+        # Dimenstionality reduction before clustering
+        descriptors = self.reduction_algo.transform(descriptors)
 
         visual_words = kmeans.predict(descriptors)
-        
-        
-        # Create a histogram of visual words
-        codebook_descriptor = np.zeros(kmeans.n_clusters)
-        for label in visual_words:
-            codebook_descriptor[label] += 1
-        
-        # Normalize the histogram (optional)
-        codebook_descriptor = codebook_descriptor / np.linalg.norm(codebook_descriptor)
-        
-        return codebook_descriptor       
-    
 
+        # Kpts coordinates
+        x_coords = kpts[:, 0]
+        y_coords = kpts[:, 1]
 
+        # Create descriptor with levels: 0 (1x1), 1 (2x2), 2 (4x4)...
+        pyramid_descriptor = []
+        for l in range(self.pyramid_lvls):
+            divs = 2**l
+            step_x = IMGS_SHAPE[1] / divs
+            step_y = IMGS_SHAPE[0] / divs
+
+            # Iterate through cells
+            for i in range(divs):      # Y-axis
+                for j in range(divs):  # X-axis
+
+                    # Create boolean mask for points inside this cell
+                    mask = (
+                        (x_coords >= j*step_x) & (x_coords < (j+1)*step_x) & 
+                        (y_coords >= i*step_y) & (y_coords < (i+1)*step_y)
+                    )
+
+                    # Get visual words belonging to this cell
+                    cell_words = visual_words[mask]
+
+                    # Create histogram of visual words
+                    codebook_descriptor = np.zeros(kmeans.n_clusters)
+                    for label in cell_words:
+                        codebook_descriptor[label] += 1
+                    
+                    # Append to pyramid descriptor
+                    pyramid_descriptor.append(codebook_descriptor)
+
+        final_descriptor = np.concatenate(pyramid_descriptor)
+
+        # Normalize the histograms (optional)
+        if self.normalize:
+            final_descriptor /= (np.linalg.norm(final_descriptor) + 1e-7)
+
+        return final_descriptor
 
 
 def visualize_bow_histogram(histogram, image_index, output_folder="./test_example.jpg"):

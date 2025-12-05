@@ -1,2 +1,7 @@
 data
 __pycache__
+*.pkl
+API_KEY
+.venv/
+wandb/
+pyproject.toml
