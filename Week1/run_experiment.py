@@ -1,6 +1,6 @@
 import wandb
 
-from main import train, test, Dataset, SPLIT_PATH, get_descriptors
+from main import train, test, TrainDataset, TestDataset
 from bovw import BOVW
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
@@ -21,7 +21,6 @@ def run_experiment():
         "cache_train":"./cache_train_descriptor.pkl",
         "cache_test":"./cache_test_descriptor.pkl",
         "codebook_size": 50,
-        "dataset_path": SPLIT_PATH,
         "classifier_algorithm": "LogisticRegression",  # Options: 'LogisticRegression', 'SVM'
         "classifier_kwargs": {},
     }
@@ -38,8 +37,8 @@ def run_experiment():
     print(f"Starting experiment with config: {cfg}")
     
     print("Loading datasets...")
-    data_train = Dataset(ImageFolder=SPLIT_PATH + "train")
-    data_test = Dataset(ImageFolder=SPLIT_PATH + "test")
+    data_train = TrainDataset()
+    data_test = TestDataset()
 
     if cfg.classifier_algorithm == 'LogisticRegression':
         classifier = LogisticRegression(class_weight="balanced", **cfg.classifier_kwargs)

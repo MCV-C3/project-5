@@ -128,9 +128,18 @@ def Dataset(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[Type[Image.Ima
 
     return dataset
 
+def TrainDataset() -> List[Tuple[Type[Image.Image], int]]:
+    """Wrapper for training dataset"""
+    return Dataset(ImageFolder=SPLIT_PATH+"train")
+
+def TestDataset() -> List[Tuple[Type[Image.Image], int]]:
+    """Wrapper for testing dataset"""
+    return Dataset(ImageFolder=SPLIT_PATH+"test")
+
+
 if __name__ == "__main__":
-    data_train = Dataset(ImageFolder=SPLIT_PATH+"train")
-    data_test = Dataset(ImageFolder=SPLIT_PATH+"test") 
+    data_train = TrainDataset()
+    data_test = TestDataset()
 
     bovw = BOVW()
     
