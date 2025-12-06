@@ -1,4 +1,5 @@
 import wandb
+import gc
 
 from main import train, test, TrainDataset, TestDataset
 from bovw import BOVW
@@ -11,22 +12,62 @@ import matplotlib.pyplot as plt
 
 from metrics import MetricsComputer
 
-def run_experiment():
-
-    config_defaults = {
+def run_experiment(wandb_config=None, experiment_config=None):
+    """
+    Run the BOVW experiment with the given configurations.
+    
+    Args:
+        wandb_config (dict): Configuration for wandb initialization containing:
+            - project (str): wandb project name
+            - entity (str): wandb entity name
+        experiment_config (dict): Configuration for the experiment containing:
+            - detector_type (str): Type of detector (SIFT, ORB, AKAZE, DenseSIFT)
+            - detector_kwargs (dict): Keyword arguments for detector
+            - codebook_kwargs (dict): Keyword arguments for codebook
+            - pyramid_lvls (int): Number of pyramid levels
+            - codebook_size (int): Size of codebook
+            - normalize_histograms (bool): Whether to normalize histograms
+            - use_pca (bool): Whether to use PCA
+            - n_pca (int): Number of PCA components
+            - classifier_algorithm (str): Classifier type (LogisticRegression or SVM)
+            - classifier_kwargs (dict): Keyword arguments for classifier
+    """
+    
+    # Default configurations
+    default_wandb_config = {
+        "project": "C3-Week1-BOVW",
+        "entity": "project-5",
+    }
+    
+    default_experiment_config = {
         "detector_type": "SIFT",
-        #"cache_train":"./cache_train_descriptor.pkl",
-        #"cache_test":"./cache_test_descriptor.pkl",
+        "detector_kwargs": {},
+        "codebook_kwargs": {},
+        "pyramid_lvls": 1,
         "codebook_size": 50,
-        "classifier_algorithm": "LogisticRegression",  # Options: 'LogisticRegression', 'SVM'
+        "normalize_histograms": True,
+        "use_pca": False,
+        "n_pca": 64,
+        "classifier_algorithm": "LogisticRegression",
         "classifier_kwargs": {},
     }
+    
+    # Merge with provided configs
+    if wandb_config is None:
+        wandb_config = default_wandb_config
+    else:
+        wandb_config = {**default_wandb_config, **wandb_config}
+    
+    if experiment_config is None:
+        experiment_config = default_experiment_config
+    else:
+        experiment_config = {**default_experiment_config, **experiment_config}
 
     # Init wandb
     wandb.init(
-        project="C3-Week1-BOVW",
-        entity="project-5",
-        config=config_defaults,
+        project=wandb_config["project"],
+        entity=wandb_config["entity"],
+        config=experiment_config,
     )
 
     cfg = wandb.config
@@ -38,15 +79,15 @@ def run_experiment():
     data_test = TestDataset()
 
     if cfg.classifier_algorithm == 'LogisticRegression':
-        classifier = LogisticRegression(class_weight="balanced", **cfg.classifier_kwargs)
+        classifier = LogisticRegression(class_weight="balanced", **dict(cfg.classifier_kwargs))
     elif cfg.classifier_algorithm == 'SVM':
-        classifier = SVC(class_weight="balanced", probability=True,**cfg.classifier_kwargs)
+        classifier = SVC(class_weight="balanced", probability=True, **dict(cfg.classifier_kwargs))
     
     bovw = BOVW(
         detector_type=cfg.detector_type,
         codebook_size=cfg.codebook_size,
-        detector_kwargs=cfg.detector_kwargs,
-        codebook_kwargs=cfg.codebook_kwargs,
+        detector_kwargs=dict(cfg.detector_kwargs),
+        codebook_kwargs=dict(cfg.codebook_kwargs),
         pyramid_lvls=cfg.pyramid_lvls,
         normalize=cfg.normalize_histograms,
         use_pca=cfg.use_pca,
@@ -54,10 +95,15 @@ def run_experiment():
     )
     
     # Compute cache paths
-    kwarg_detector_str = [f"_{str(key)}-{str(value)}" for key, value in cfg.detector_kwargs]
+    det_kwargs = dict(cfg.detector_kwargs)
+    kwarg_detector_str = [f"_{str(key)}-{str(value)}" for key, value in det_kwargs.items()]
     kwarg_detector_str = "".join(kwarg_detector_str)
-    cache_file_train = "./cache_train/"+cfg.detector_type+kwarg_detector_str
-    cache_file_test = "./cache_test/"+cfg.detector_type+kwarg_detector_str
+    cache_train = "/home/bernat/MCV/C3/project/project-5/cache_train/"
+    cache_test = "/home/bernat/MCV/C3/project/project-5/cache_test/"
+    cache_train = "./cache_train/"
+    cache_test = "./cache_test/"
+    cache_file_train = cache_train + cfg.detector_type + kwarg_detector_str
+    cache_file_test = cache_test + cfg.detector_type + kwarg_detector_str
     
     print("Training the model...")
     
@@ -73,7 +119,7 @@ def run_experiment():
     print("Evaluating the model...")
     y_pred_test, y_probas_test, labels_test = test(dataset=data_test, bovw=bovw, 
                                                    classifier=classifier,
-                                                       cache_file=cache_file_test)
+                                                   cache_file=cache_file_test)
 
     test_acc = accuracy_score(y_true=labels_test, y_pred=y_pred_test)
     
@@ -169,12 +215,33 @@ def run_experiment():
     #     "AUC_per_class": auc_per_class,
     # })
 
+    plt.close('all')
+    gc.collect()
     print(f"Experiment completed. Train Acc: {train_acc}, Test Acc: {test_acc}")
 
     wandb.finish()
 
 if __name__ == "__main__":
-    run_experiment()
+    config_experiment = {
+        "detector_type": "SIFT",
+        "detector_kwargs": {},
+        "codebook_kwargs": {},
+        "pyramid_lvls": 1,
+        "codebook_size": 512,
+        "normalize_histograms": True,
+        "use_pca": False,
+        "n_pca": 64,
+        "classifier_algorithm": "SVM",
+        "classifier_kwargs": {
+            "C": 1,
+            "kernel": "rbf"
+        }
+    }
+    config_wandb = {
+        "project": "C3-Week1-BOVW",
+        "entity": "project-5",
+    }
+    run_experiment(config_wandb, config_experiment)
 
 
 

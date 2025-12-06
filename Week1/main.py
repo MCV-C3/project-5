@@ -14,6 +14,7 @@ from sklearn.model_selection import cross_val_predict
 from sklearn.metrics import accuracy_score
 from sklearn.svm import SVC
 
+SPLIT_PATH = "/home/bernat/MCV/C3/project/project-5/data/MIT_split/"
 SPLIT_PATH = "../data/MIT_split/"
 
 
@@ -35,7 +36,7 @@ def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOV
         all_kpts = data['kpts']
         all_descriptors = data['descriptors']
         all_labels = data['labels']
-
+        del data
     else:
         all_kpts = []
         all_descriptors = []
@@ -60,7 +61,7 @@ def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOV
                 'descriptors': all_descriptors,
                 'labels': all_labels
             }, f)
-
+        
     return all_kpts, all_descriptors, all_labels
 
 
@@ -76,6 +77,7 @@ def test(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW],
     y_probas = classifier.predict_proba(bovw_histograms)
     y_pred = np.argmax(y_probas, axis=1)
 
+    del bovw_histograms, classifier
     return y_pred, y_probas, descriptors_labels 
 
 def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW], 
@@ -93,20 +95,22 @@ def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW],
     print("Fitting the classifier")
     
     # Obtain the predictions and probabilities of the train set using cross-validation
+    classifier.fit(bovw_histograms, all_labels)
+    
     y_probas = cross_val_predict(estimator=classifier,
                                 X=bovw_histograms, 
                                 y=all_labels, 
                                 cv=k_folds, 
                                 method='predict_proba',
-                                n_jobs=-1
+                                n_jobs=11
                                 )
     y_pred = np.argmax(y_probas, axis=1)
 
     
-    classifier.fit(bovw_histograms, all_labels)
     #y_pred = classifier.predict(bovw_histograms)
     #y_probas = classifier.predict_proba(bovw_histograms)
-    
+    print("Classifier fitted.")
+    del all_kpts, all_descriptors, bovw_histograms, classifier
     return y_pred, y_probas, all_labels
 
 
