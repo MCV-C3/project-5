@@ -73,8 +73,8 @@ def test(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW],
     bovw_histograms = extract_bovw_histograms(kpts=test_kpts, descriptors=test_descriptors, bovw=bovw)
 
     print("Predicting the values")
-    y_pred = classifier.predict(bovw_histograms)
     y_probas = classifier.predict_proba(bovw_histograms)
+    y_pred = np.argmax(y_probas, axis=1)
 
     return y_pred, y_probas, descriptors_labels 
 
@@ -93,21 +93,15 @@ def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW],
     print("Fitting the classifier")
     
     # Obtain the predictions and probabilities of the train set using cross-validation
-    y_pred = cross_val_predict(
-        estimator=classifier,
-        X=bovw_histograms,
-        y=all_labels,
-        cv=k_folds,
-        n_jobs=-1
-    )
-    y_probas = cross_val_predict(
-        estimator=classifier,
-        X=bovw_histograms, 
-        y=all_labels, 
-        cv=k_folds, 
-        method='predict_proba',
-        n_jobs=-1
-    )
+    y_probas = cross_val_predict(estimator=classifier,
+                                X=bovw_histograms, 
+                                y=all_labels, 
+                                cv=k_folds, 
+                                method='predict_proba',
+                                n_jobs=-1
+                                )
+    y_pred = np.argmax(y_probas, axis=1)
+
     
     classifier.fit(bovw_histograms, all_labels)
     #y_pred = classifier.predict(bovw_histograms)
