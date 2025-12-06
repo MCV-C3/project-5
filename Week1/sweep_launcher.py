@@ -37,6 +37,12 @@ sweep_config = {
         'n_pca':{
             'values': [64]    
         },
+        'stride':{
+            'values': [8]
+        },
+        'scale':{
+            'values': [2]
+        },
         'classifier_algorithm':{
             'values': ['LogisticRegression']
         },

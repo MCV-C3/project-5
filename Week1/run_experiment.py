@@ -91,7 +91,9 @@ def run_experiment(wandb_config=None, experiment_config=None):
         pyramid_lvls=cfg.pyramid_lvls,
         normalize=cfg.normalize_histograms,
         use_pca=cfg.use_pca,
-        n_pca=cfg.n_pca
+        n_pca=cfg.n_pca,
+        stride=cfg.stride,
+        scale=cfg.scale
     )
     
     # Compute cache paths
