@@ -40,7 +40,7 @@ def run_experiment():
     if cfg.classifier_algorithm == 'LogisticRegression':
         classifier = LogisticRegression(class_weight="balanced", **cfg.classifier_kwargs)
     elif cfg.classifier_algorithm == 'SVM':
-        classifier = SVC(class_weight="balanced", probability=True,**cfg.classifier_kwargs)
+        classifier = SVC(class_weight="balanced", probability=True, random_state=42, **cfg.classifier_kwargs)
     
     bovw = BOVW(
         detector_type=cfg.detector_type,
@@ -56,8 +56,8 @@ def run_experiment():
     # Compute cache paths
     kwarg_detector_str = [f"_{str(key)}-{str(value)}" for key, value in cfg.detector_kwargs]
     kwarg_detector_str = "".join(kwarg_detector_str)
-    cache_file_train = "./cache_train/"+cfg.detector_type+kwarg_detector_str
-    cache_file_test = "./cache_test/"+cfg.detector_type+kwarg_detector_str
+    cache_file_train = "./cache_train/"+cfg.detector_type+kwarg_detector_str+".pkl"
+    cache_file_test = "./cache_test/"+cfg.detector_type+kwarg_detector_str+".pkl"
     
     print("Training the model...")
     
