@@ -90,6 +90,6 @@ def run_experiment_with_wandb_config():
     """Wrapper function to pass wandb_config to run_experiment."""
     run_experiment(wandb_config=wandb_config)
 
-sweep_id = wandb.sweep(sweep_config_test_detector_codebook, project=wandb_config["project"], entity=wandb_config["entity"])
+sweep_id = wandb.sweep(sweep_config, project=wandb_config["project"], entity=wandb_config["entity"])
 print(f"Initiated sweep with ID: {sweep_id}")
 wandb.agent(sweep_id, function=run_experiment)

@@ -36,7 +36,7 @@ def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOV
         all_kpts = data['kpts']
         all_descriptors = data['descriptors']
         all_labels = data['labels']
-        del data
+        #del data
     else:
         all_kpts = []
         all_descriptors = []
@@ -77,7 +77,7 @@ def test(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW],
     y_probas = classifier.predict_proba(bovw_histograms)
     y_pred = np.argmax(y_probas, axis=1)
 
-    del bovw_histograms, classifier
+    #del bovw_histograms, classifier
     return y_pred, y_probas, descriptors_labels 
 
 def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW], 
@@ -108,7 +108,7 @@ def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW],
     #y_pred = classifier.predict(bovw_histograms)
     #y_probas = classifier.predict_proba(bovw_histograms)
     print("Classifier fitted.")
-    del all_kpts, all_descriptors, bovw_histograms, classifier
+    #del all_kpts, all_descriptors, bovw_histograms, classifier
     return y_pred, y_probas, all_labels
 
 

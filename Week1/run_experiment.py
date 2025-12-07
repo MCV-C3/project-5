@@ -104,8 +104,8 @@ def run_experiment(wandb_config=None, experiment_config=None):
     cache_test = "/home/bernat/MCV/C3/project/project-5/cache_test/"
     cache_train = "./cache_train/"
     cache_test = "./cache_test/"
-    cache_file_train = cache_train + cfg.detector_type + kwarg_detector_str
-    cache_file_test = cache_test + cfg.detector_type + kwarg_detector_str
+    cache_file_train = cache_train + cfg.detector_type + kwarg_detector_str+".pkl"
+    cache_file_test = cache_test + cfg.detector_type + kwarg_detector_str+".pkl"
     
     print("Training the model...")
     
