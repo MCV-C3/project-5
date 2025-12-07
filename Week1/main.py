@@ -21,7 +21,7 @@ SPLIT_PATH = "../data/MIT_split/"
 def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"], kpts: Literal["N", "T"]):
     return np.array([bovw._compute_codebook_descriptor(kpts=kpt, descriptors=descriptor, kmeans=bovw.codebook_algo) for kpt,descriptor in zip(kpts,descriptors)])
 
-def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], cache_file: str, split: str):
+def get_descriptors_original(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], cache_file: str, split: str):
 
     # Try loading from cache to avoid recomputation
     if os.path.exists(cache_file):
@@ -46,6 +46,52 @@ def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOV
 
             image, label = dataset[idx]
             kpts, descriptors = bovw._extract_features(image=np.array(image))
+
+            if descriptors is not None:
+                all_kpts.append(kpts)
+                all_descriptors.append(descriptors)
+                all_labels.append(label)
+        
+        print(f"Saving features to {cache_file}")
+        os.makedirs("./cache_test", exist_ok=True)
+        os.makedirs("./cache_train", exist_ok=True)
+        with open(cache_file, 'wb') as f:
+            pickle.dump({
+                'kpts': all_kpts,
+                'descriptors': all_descriptors,
+                'labels': all_labels
+            }, f)
+        
+    return all_kpts, all_descriptors, all_labels
+
+
+def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], cache_file: str, split: str):
+
+    # Try loading from cache to avoid recomputation
+    if os.path.exists(cache_file):
+    #if False:    
+        print(f"Phase[{split}]: Loading descriptors from {cache_file}")
+        try:
+            with open(cache_file, 'rb') as f:
+                data = pickle.load(f)
+        except:
+            raise ValueError(f"Could not load cache file {cache_file}")
+
+        all_kpts = data['kpts']
+        all_descriptors = data['descriptors']
+        all_labels = data['labels']
+        del data
+    else:
+        all_kpts = []
+        all_descriptors = []
+        all_labels = []
+
+        for idx in tqdm.tqdm(range(len(dataset)), desc=f"Phase[{split}]: Extracting the descriptors"):
+
+            image_path, label = dataset[idx]
+            with Image.open(image_path) as img_pil:
+                image_np = np.array(img_pil.convert("RGB"))
+                kpts, descriptors = bovw._extract_features(image=image_np)
 
             if descriptors is not None:
                 all_kpts.append(kpts)
@@ -94,7 +140,7 @@ def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW],
     
     print("Fitting the classifier")
     
-    # Obtain the predictions and probabilities of the train set using cross-validation    
+    # Obtain the predictions and probabilities of the train set using cross-validation
     y_probas = cross_val_predict(estimator=classifier,
                                 X=bovw_histograms, 
                                 y=all_labels, 
@@ -103,7 +149,7 @@ def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW],
                                 n_jobs=11
                                 )
     y_pred = np.argmax(y_probas, axis=1)
-    
+
     classifier.fit(bovw_histograms, all_labels)    
     #y_pred = classifier.predict(bovw_histograms)
     #y_probas = classifier.predict_proba(bovw_histograms)
@@ -112,7 +158,7 @@ def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW],
     return y_pred, y_probas, all_labels
 
 
-def Dataset(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[Type[Image.Image], int]]:
+def Dataset_original(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[Type[Image.Image], int]]:
 
     """
     Expected Structure:
@@ -142,6 +188,21 @@ def Dataset(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[Type[Image.Ima
 
             dataset.append((img_pil, map_classes[cls_folder]))
 
+
+    return dataset
+
+def Dataset(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[str, int]]: # Changed Type Hint
+    """
+    Returns a list of (image_path, label) tuples instead of (image_object, label).
+    """
+    map_classes = {clsi: idx for idx, clsi  in enumerate(os.listdir(ImageFolder))}
+    dataset :List[Tuple] = []
+
+    for idx, cls_folder in enumerate(os.listdir(ImageFolder)):
+        image_path = os.path.join(ImageFolder, cls_folder)
+        images: List[str] = glob.glob(image_path+"/*.jpg")
+        for img in images:
+            dataset.append((img, map_classes[cls_folder])) 
 
     return dataset
 

@@ -26,7 +26,7 @@ sweep_config = {
             'values': [1]    
         },
         'codebook_size': {
-            'values': [100]
+            'values': [200]
         },
         'normalize_histograms':{
             'values': [True]    
@@ -44,13 +44,13 @@ sweep_config = {
             'values': [2]
         },
         'classifier_algorithm':{
-            'values': ['LogisticRegression']
+            'values': ['SVM']
         },
         'classifier_kwargs':{
             'values': [
-                #{'C': 1, 'kernel': 'rbf'}
-                {}
-                ]
+                {'C': 1,
+                'kernel': 'rbf'}
+            ]
         }
     },
     'metric': {
@@ -72,12 +72,15 @@ sweep_config_test_detector_codebook = {
         },
         # Test the impact of vocabulary size
         'codebook_size': {
-            'values': [512, 1024]
+            'values': [256, 512, 1024]
         },
         # Keep these fixed for now to isolate feature performance
         'pyramid_lvls': {'values': [1]},
         'normalize_histograms': {'values': [True]},
         'use_pca': {'values': [False]},
+        'n_pca':{'values': [64]},
+        'stride':{'values': [8]},
+        'scale':{'values': [2]},
         # 'classifier_algorithm': {'values': ['SVM']},
         # 'classifier_kwargs': {'values': [{'C': 1, 'kernel': 'rbf'}]},
         'classifier_algorithm': {'values': ['LogisticRegression']},
