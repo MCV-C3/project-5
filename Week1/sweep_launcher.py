@@ -17,7 +17,7 @@ sweep_config = {
             'values': [
                 #{'nfeatures': 10}
                 {}
-            ]  
+                ]  
         },
         'codebook_kwargs':{
             'values': [{}]  
