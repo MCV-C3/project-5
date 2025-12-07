@@ -26,7 +26,7 @@ sweep_config = {
             'values': [1]    
         },
         'codebook_size': {
-            'values': [200]
+            'values': [100]
         },
         'normalize_histograms':{
             'values': [True]    
@@ -44,13 +44,13 @@ sweep_config = {
             'values': [2]
         },
         'classifier_algorithm':{
-            'values': ['SVM']
+            'values': ['LogisticRegression']
         },
         'classifier_kwargs':{
             'values': [
-                {'C': 1,
-                'kernel': 'rbf'}
-            ]
+                #{'C': 1, 'kernel': 'rbf'}
+                {}
+                ]
         }
     },
     'metric': {

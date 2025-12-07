@@ -19,10 +19,12 @@ class MetricsComputer:
         y_true_test: Ground truth labels for test set
         probas_train: Predicted probabilities for training set
         probas_test: Predicted probabilities for test set
+        indices_per_fold: List that stores the indices for each fold. 
+            Example: indices_per_fold[0] returns all the indices of the first fold.
     """
     
     def __init__(self, y_pred_train, y_pred_test, y_true_train, y_true_test, 
-                 probas_train, probas_test):
+                 probas_train, probas_test, indices_per_fold):
         """
         Initialize the MetricsComputer.
         
@@ -33,6 +35,8 @@ class MetricsComputer:
             y_true_test: Ground truth labels for test set
             probas_train: Predicted probabilities for training set
             probas_test: Predicted probabilities for test set
+            indices_per_fold: List that stores the indices for each fold. 
+                Example: indices_per_fold[0] returns all the indices of the first fold.
         """
         self.y_pred_train = y_pred_train
         self.y_pred_test = y_pred_test
@@ -40,6 +44,7 @@ class MetricsComputer:
         self.y_true_test = y_true_test
         self.probas_train = probas_train
         self.probas_test = probas_test
+        self.indices_per_fold = indices_per_fold
         
         self.classes = np.unique(y_true_test)
         self.n_classes = len(self.classes)
@@ -47,6 +52,49 @@ class MetricsComputer:
         # Initialize metric dictionaries
         self.train_metrics = {}
         self.test_metrics = {}
+        self.fold_metris = {}
+    
+    def compute_fold_metrics(self):
+        """
+        Computes Accuracy, Precision, Recall, and F1-score individually for each fold 
+        using the stored indices. Populates self.fold_metrics.
+        
+        Returns:
+            dict: A dictionary containing lists of metrics for each fold.
+                  e.g., {'accuracy': [0.8, 0.85, ...], 'f1_macro': [0.79, 0.82, ...]}
+        """
+        # Initialize dictionary to store list of scores per fold
+        self.fold_metrics = {
+            'accuracy': [],
+            'precision_macro': [],
+            'recall_macro': [],
+            'f1_macro': []
+        }
+
+        y_true_train = np.array(self.y_true_train)
+        y_pred_train = np.array(self.y_pred_train)
+        # Iterate through each fold using the stored indices
+        for fold_idx, indices in enumerate(self.indices_per_fold):
+            
+            # Slice the global test arrays to get only the samples for this specific fold
+            y_true_fold = y_true_train[indices]
+            y_pred_fold = y_pred_train[indices]
+
+            # Calculate metrics for the current fold
+            # Note: We use 'macro' average for multiclass consistency
+            acc = accuracy_score(y_true_fold, y_pred_fold)
+            prec = precision_score(y_true_fold, y_pred_fold, average="macro", zero_division=0)
+            rec = recall_score(y_true_fold, y_pred_fold, average="macro", zero_division=0)
+            f1 = f1_score(y_true_fold, y_pred_fold, average="macro", zero_division=0)
+
+            # Append scores to the respective lists
+            self.fold_metrics['accuracy'].append(acc)
+            self.fold_metrics['precision_macro'].append(prec)
+            self.fold_metrics['recall_macro'].append(rec)
+            self.fold_metrics['f1_macro'].append(f1)
+            
+            # Optional: Print fold results for debugging/logging
+            # print(f"Fold {fold_idx+1}: Acc={acc:.4f}, F1={f1:.4f}")
     
     def compute_accuracy(self):
         """Compute accuracy for train and test sets."""
@@ -166,6 +214,7 @@ class MetricsComputer:
         self.compute_accuracy()
         self.compute_precision_recall_f1()
         self.compute_confusion_matrix()
+        self.compute_fold_metrics()
         y_test_bin = self.compute_auc()
         return y_test_bin
     
@@ -178,10 +227,11 @@ class MetricsComputer:
         return self.train_metrics
     
     def get_all_metrics_dict(self):
-        """Return all metrics (train + test) as dictionary."""
+        """Return all metrics (train + test + folds) as dictionary."""
         return {
             "train": self.train_metrics,
-            "test": self.test_metrics
+            "test": self.test_metrics,
+            "folds": self.fold_metrics
         }
     
     def print_metrics(self):

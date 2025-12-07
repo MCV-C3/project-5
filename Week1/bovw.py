@@ -38,7 +38,7 @@ class BOVW():
             raise ValueError("Detector type must be 'SIFT', 'SURF', or 'ORB'")
         
         self.codebook_size = codebook_size
-        self.codebook_algo = MiniBatchKMeans(n_clusters=self.codebook_size, **codebook_kwargs)
+        self.codebook_algo = MiniBatchKMeans(n_clusters=self.codebook_size, **codebook_kwargs, random_state=42)
         self.pyramid_lvls = pyramid_lvls
         self.normalize = normalize
         self.reduction_algo = PCA(n_components=n_pca) if use_pca else EmptyTransform()

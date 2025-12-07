@@ -13,6 +13,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import cross_val_predict
 from sklearn.metrics import accuracy_score
 from sklearn.svm import SVC
+from sklearn.model_selection import StratifiedKFold
 
 SPLIT_PATH = "/home/bernat/MCV/C3/project/project-5/data/MIT_split/"
 SPLIT_PATH = "../data/MIT_split/"
@@ -129,6 +130,9 @@ def test(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW],
 def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW], 
           classifier: Type[object], k_folds: int=5, cache_file: str=None):
 
+    # Define a stratified splitter for dealing with the unbalanced classes
+    cv_splitter = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=42)
+    
     all_kpts, all_descriptors, all_labels = get_descriptors(dataset, bovw, cache_file, split="Train")
 
     print("Fitting the codebook", end=" ")
@@ -138,13 +142,18 @@ def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW],
     print("Computing the bovw histograms")
     bovw_histograms = extract_bovw_histograms(kpts=all_kpts, descriptors=all_descriptors, bovw=bovw) 
     
-    print("Fitting the classifier")
+    # Do a mapping so we can know to which fold corresponds each train sample
+    indices_per_fold = []
+    for fold_idx, (train_index, test_index) in enumerate(cv_splitter.split(bovw_histograms, all_labels)):
+        indices_per_fold.append(test_index)
+    
+    print("Fitting the classifier (cross-validation)")
     
     # Obtain the predictions and probabilities of the train set using cross-validation
     y_probas = cross_val_predict(estimator=classifier,
                                 X=bovw_histograms, 
                                 y=all_labels, 
-                                cv=k_folds, 
+                                cv=cv_splitter, 
                                 method='predict_proba',
                                 n_jobs=11
                                 )
@@ -155,7 +164,7 @@ def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW],
     #y_probas = classifier.predict_proba(bovw_histograms)
     print("Classifier fitted.")
     #del all_kpts, all_descriptors, bovw_histograms, classifier
-    return y_pred, y_probas, all_labels
+    return y_pred, y_probas, all_labels, indices_per_fold
 
 
 def Dataset_original(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[Type[Image.Image], int]]:

@@ -109,7 +109,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
     
     print("Training the model...")
     
-    y_pred_train, y_probas_train, labels_train = train(dataset=data_train, bovw=bovw, 
+    y_pred_train, y_probas_train, labels_train, indices_per_fold = train(dataset=data_train, bovw=bovw, 
                                                        classifier=classifier, 
                                                        cache_file=cache_file_train)
 
@@ -132,7 +132,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
     
     metrics = MetricsComputer(y_pred_train, y_pred_test, 
                                    labels_train, labels_test,
-                                   y_probas_train, y_probas_test)
+                                   y_probas_train, y_probas_test, indices_per_fold)
     
     # BASIC METRICS (PRECISION, RECALL, F1, ACCURACY, AUC)
     metrics.compute_all_metrics()
