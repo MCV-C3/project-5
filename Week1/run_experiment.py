@@ -217,6 +217,12 @@ def run_experiment(wandb_config=None, experiment_config=None):
     #     "AUC_per_class": auc_per_class,
     # })
 
+    # DELETE VARIABLES TO FREE MEMORY
+    del data_train, data_test
+    del bovw, classifier
+    del y_pred_train, y_probas_train, labels_train
+    del y_pred_test, y_probas_test, labels_test
+
     plt.close('all')
     gc.collect()
     print(f"Experiment completed. Train Acc: {train_acc}, Test Acc: {test_acc}")
