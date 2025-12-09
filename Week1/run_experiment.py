@@ -12,6 +12,70 @@ import matplotlib.pyplot as plt
 
 from metrics import MetricsComputer
 
+def histogram_intersection_kernel(X, Y):
+    """
+    Computes the Histogram Intersection Kernel between two matrices X and Y.
+    
+    Optimized to avoid MemoryError by iterating over rows instead of 
+    broadcasting the full 3D tensor.
+    
+    Args:
+        X (np.ndarray): Array of shape (n_samples_1, n_features)
+        Y (np.ndarray): Array of shape (n_samples_2, n_features)
+        
+    Returns:
+        np.ndarray: Gram matrix of shape (n_samples_1, n_samples_2)
+    """
+    X = np.asarray(X)
+    Y = np.asarray(Y)
+    
+    n_samples_X = X.shape[0]
+    n_samples_Y = Y.shape[0]
+    
+    # Pre-allocate the result matrix
+    K = np.zeros((n_samples_X, n_samples_Y))
+    
+    # Iterate over samples in X to compute the intersection row by row.
+    # This avoids creating the massive (N, N, Features) array.
+    for i in range(n_samples_X):
+        # 1. Take one row from X: shape (n_features,)
+        # 2. Compare it against ALL rows in Y: shape (n_samples_Y, n_features)
+        # 3. Sum across features (axis=1) to get the kernel values for this row
+        K[i, :] = np.sum(np.minimum(X[i], Y), axis=1)
+        
+    return K
+
+def get_classifier(cfg):
+    """
+    Factory function to initialize the classifier based on configuration.
+    Handles custom kernels for SVM.
+    """
+    # Create a mutable dictionary from the configuration
+    classifier_kwargs = dict(cfg.classifier_kwargs)
+    
+    classifier = None
+
+    if cfg.classifier_algorithm == 'LogisticRegression':
+        classifier = LogisticRegression(
+            class_weight="balanced", 
+            **classifier_kwargs
+        )
+        
+    elif cfg.classifier_algorithm == 'SVM':
+        # Check if the requested kernel is the custom 'histogram_intersection'
+        if classifier_kwargs.get('kernel') == 'histogram_intersection':
+            print("INFO: Using custom Histogram Intersection Kernel.")
+            # Replace the string identifier with the actual callable function
+            classifier_kwargs['kernel'] = histogram_intersection_kernel
+
+        classifier = SVC(
+            class_weight="balanced", 
+            probability=True, 
+            **classifier_kwargs
+        )
+        
+    return classifier
+
 def run_experiment(wandb_config=None, experiment_config=None):
     """
     Run the BOVW experiment with the given configurations.
@@ -78,10 +142,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
     data_train = TrainDataset()
     data_test = TestDataset()
 
-    if cfg.classifier_algorithm == 'LogisticRegression':
-        classifier = LogisticRegression(class_weight="balanced", **dict(cfg.classifier_kwargs))
-    elif cfg.classifier_algorithm == 'SVM':
-        classifier = SVC(class_weight="balanced", probability=True, **dict(cfg.classifier_kwargs))
+    classifier=get_classifier(cfg)
     
     bovw = BOVW(
         detector_type=cfg.detector_type,
@@ -93,7 +154,8 @@ def run_experiment(wandb_config=None, experiment_config=None):
         use_pca=cfg.use_pca,
         n_pca=cfg.n_pca,
         stride=cfg.stride,
-        scale=cfg.scale
+        scale=cfg.scale,
+        use_standard_scaler = cfg.use_standard_scaling
     )
     
     # Compute cache paths
@@ -106,6 +168,10 @@ def run_experiment(wandb_config=None, experiment_config=None):
     cache_test = "./cache_test/"
     cache_file_train = cache_train + cfg.detector_type + kwarg_detector_str+".pkl"
     cache_file_test = cache_test + cfg.detector_type + kwarg_detector_str+".pkl"
+    
+    if cfg.detector_type == "DenseSIFT":
+        cache_file_train = cache_train + cfg.detector_type + "_stride-" + str(cfg.stride) + "_scale-" + str(cfg.scale) + ".pkl"
+        cache_file_test = cache_test + cfg.detector_type + "_stride-" + str(cfg.stride) + "_scale-" + str(cfg.scale) + ".pkl"
     
     print("Training the model...")
     

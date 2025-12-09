@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import os
 from sklearn.decomposition import PCA
 import time
+from sklearn.preprocessing import StandardScaler
+from sklearn.utils import shuffle
 
 from typing import *
 
@@ -19,7 +21,7 @@ class EmptyTransform():
 
 class BOVW():
 
-    def __init__(self, detector_type="DenseSIFT", codebook_size:int=500, detector_kwargs:dict={}, codebook_kwargs:dict={}, pyramid_lvls:int=1, normalize:bool=True, use_pca:bool=False, n_pca:int=64, stride = 8, scale = 2):
+    def __init__(self, detector_type="DenseSIFT", codebook_size:int=500, detector_kwargs:dict={}, codebook_kwargs:dict={}, pyramid_lvls:int=1, normalize:bool=True, use_pca:bool=False, n_pca:int=64, stride = 8, scale = 2, use_standard_scaler = False):
 
         self.detector_type = detector_type
 
@@ -42,6 +44,7 @@ class BOVW():
         self.pyramid_lvls = pyramid_lvls
         self.normalize = normalize
         self.reduction_algo = PCA(n_components=n_pca) if use_pca else EmptyTransform()
+        self.scaling_algo = StandardScaler() if use_standard_scaler else EmptyTransform()
         
                
     ## Modified to create a dense sift if needed
@@ -56,11 +59,34 @@ class BOVW():
     
     
     def _update_fit_codebook(self, descriptors: Literal["N", "T", "d"]) -> str:
+        # Define max number of descriptors to use for fitting the transformers
+        MAX_SAMPLES_FOR_FIT = 500000
         
+        # Flatten the list of descriptor arrays into a single, massive array (all_descriptors)
         all_descriptors = np.vstack(descriptors)
+        
+        # Take a representative random subset (sample) for fitting
+        if all_descriptors.shape[0] > MAX_SAMPLES_FOR_FIT:
+            # If the total descriptor count is too high, shuffle and take only a subset.
+            X_sample = shuffle(all_descriptors, n_samples=MAX_SAMPLES_FOR_FIT, random_state=42)
+        else:
+            X_sample = all_descriptors
+        
+        # Fit PCA on the transformed sample data to learn mean/std
+        if hasattr(self.reduction_algo, 'fit'):
+            self.reduction_algo.fit(X_sample)
+
+        # Fit scaler on the transformed sample data to learn mean/std
+        if hasattr(self.scaling_algo, 'fit'):
+            self.scaling_algo.fit(X_sample)
+        
+        # Standard scaling before clustering
+        if hasattr(self.scaling_algo, 'transform'):
+            all_descriptors = self.scaling_algo.transform(all_descriptors)
 
         # Dimensionality reduction before clustering
-        all_descriptors = self.reduction_algo.fit_transform(all_descriptors)
+        if hasattr(self.reduction_algo, 'transform'):
+            all_descriptors = self.reduction_algo.transform(all_descriptors)        
 
         # K-Means clustering for codebook
         start = time.time()
@@ -72,6 +98,9 @@ class BOVW():
     def _compute_codebook_descriptor(self, kpts: Literal["1 T"], descriptors: Literal["1 T d"], kmeans: Type[KMeans]) -> np.ndarray:
         # Dimenstionality reduction before clustering
         descriptors = self.reduction_algo.transform(descriptors)
+        
+        # Standard scaling before clustering
+        descriptors = self.scaling_algo.transform(descriptors)
 
         visual_words = kmeans.predict(descriptors)
 

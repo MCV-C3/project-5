@@ -11,13 +11,10 @@ sweep_config = {
     'method': 'grid',
     'parameters': {
         'detector_type': {
-            'values': ['SIFT', 'ORB', 'AKAZE', 'DenseSIFT']
+            'values': ['DenseSIFT']
         },
         'detector_kwargs':{
-            'values': [
-                #{'nfeatures': 10}
-                {}
-                ]  
+            'values': [{}]  
         },
         'codebook_kwargs':{
             'values': [{}]  
@@ -26,10 +23,13 @@ sweep_config = {
             'values': [1]    
         },
         'codebook_size': {
-            'values': [100]
+            'values': [256]
         },
         'normalize_histograms':{
             'values': [True]    
+        },
+        'use_standard_scaling':{
+            'values': [True]  
         },
         'use_pca':{
             'values': [False]    
@@ -41,15 +41,17 @@ sweep_config = {
             'values': [8]
         },
         'scale':{
-            'values': [2]
+            'values': [8]
         },
         'classifier_algorithm':{
-            'values': ['LogisticRegression']
+            'values': ['SVM']
         },
         'classifier_kwargs':{
             'values': [
-                #{'C': 1, 'kernel': 'rbf'}
-                {}
+                {'C': 1, 'kernel':'rbf'},
+                #{'C': 1, 'kernel':'linear'},
+                #{'C': 1, 'kernel':'histogram_intersection'},
+                #{}
                 ]
         }
     },
