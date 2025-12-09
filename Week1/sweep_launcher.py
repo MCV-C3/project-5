@@ -20,7 +20,7 @@ sweep_config = {
             'values': [{}]  
         },
         'pyramid_lvls':{
-            'values': [1]    
+            'values': [3]    
         },
         'codebook_size': {
             'values': [256]
@@ -29,7 +29,7 @@ sweep_config = {
             'values': [True]    
         },
         'use_standard_scaling':{
-            'values': [True]  
+            'values': [False]  
         },
         'use_pca':{
             'values': [False]    
