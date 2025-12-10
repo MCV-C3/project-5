@@ -114,6 +114,11 @@ def run_experiment(wandb_config=None, experiment_config=None):
         "n_pca": 64,
         "classifier_algorithm": "LogisticRegression",
         "classifier_kwargs": {},
+        "encoding": "bovw",
+        "n_components": 64,
+        "stride": 8,
+        "scale": 8,
+        "use_standard_scaler": False,
     }
     
     # Merge with provided configs
@@ -146,7 +151,9 @@ def run_experiment(wandb_config=None, experiment_config=None):
     
     bovw = BOVW(
         detector_type=cfg.detector_type,
+        encoding=cfg.encoding,
         codebook_size=cfg.codebook_size,
+        n_components=cfg.n_components,
         detector_kwargs=dict(cfg.detector_kwargs),
         codebook_kwargs=dict(cfg.codebook_kwargs),
         pyramid_lvls=cfg.pyramid_lvls,
@@ -155,23 +162,24 @@ def run_experiment(wandb_config=None, experiment_config=None):
         n_pca=cfg.n_pca,
         stride=cfg.stride,
         scale=cfg.scale,
-        use_standard_scaler = cfg.use_standard_scaling
+        use_standard_scaler = cfg.use_standard_scaler
     )
-    
+
     # Compute cache paths
     det_kwargs = dict(cfg.detector_kwargs)
     kwarg_detector_str = [f"_{str(key)}-{str(value)}" for key, value in det_kwargs.items()]
     kwarg_detector_str = "".join(kwarg_detector_str)
-    cache_train = "/home/bernat/MCV/C3/project/project-5/cache_train/"
-    cache_test = "/home/bernat/MCV/C3/project/project-5/cache_test/"
     cache_train = "./cache_train/"
     cache_test = "./cache_test/"
-    cache_file_train = cache_train + cfg.detector_type + kwarg_detector_str+".pkl"
-    cache_file_test = cache_test + cfg.detector_type + kwarg_detector_str+".pkl"
     
-    if cfg.detector_type == "DenseSIFT":
-        cache_file_train = cache_train + cfg.detector_type + "_stride-" + str(cfg.stride) + "_scale-" + str(cfg.scale) + ".pkl"
-        cache_file_test = cache_test + cfg.detector_type + "_stride-" + str(cfg.stride) + "_scale-" + str(cfg.scale) + ".pkl"
+    # Add encoding info to cache filename
+    if cfg.encoding == 'fisher':
+        cache_suffix = f"_fisher_n{cfg.n_components}_pca{cfg.n_pca if cfg.use_pca else 'no'}"
+    else:
+        cache_suffix = f"_bovw_k{cfg.codebook_size}"
+    
+    cache_file_train = cache_train + cfg.detector_type + kwarg_detector_str + cache_suffix + ".pkl"
+    cache_file_test = cache_test + cfg.detector_type + kwarg_detector_str + cache_suffix + ".pkl"
     
     print("Training the model...")
     
