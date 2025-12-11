@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH -n 4            # Number of cores
-#SBATCH --mem 2000      # 2GB asked
+#SBATCH -n 8            # Number of cores
+#SBATCH --mem 4000      # 4GB asked
 #SBATCH -p mlow         # Choose mhigh to submit to master high prioriy queue
 #SBATCH -q masterlow    # Requeue other users mlow jobs
 #SBATCH --gres gpu:1    # To ask Pascales MAX 8
