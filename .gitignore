@@ -7,3 +7,4 @@ wandb/
 pyproject.toml
 cache_test/
 cache_train/
+logs/

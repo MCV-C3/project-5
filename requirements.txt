@@ -5,3 +5,5 @@ pillow
 matplotlib
 tqdm
 wandb
+torchviz
+nvitop
