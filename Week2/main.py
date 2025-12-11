@@ -14,8 +14,11 @@ import tqdm
 # Train function
 def train(model, dataloader, criterion, optimizer, device):
     model.train()
-    train_loss = 0.0
+    running_loss = 0.0
     correct, total = 0, 0
+    all_predicted = []
+    all_labels = []
+    all_probabilities = []
 
     for inputs, labels in dataloader:
         inputs, labels = inputs.to(device), labels.to(device)
@@ -24,44 +27,60 @@ def train(model, dataloader, criterion, optimizer, device):
         outputs = model(inputs)
         loss = criterion(outputs, labels)
 
-        # Backward pass and optimization
+        # Backward pass
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        # Track loss and accuracy
-        train_loss += loss.item() * inputs.size(0)
+        # Metrics
+        running_loss += loss.item() * inputs.size(0)
         _, predicted = outputs.max(1)
+        
+        # Get Soft Probabilities (0.1, 0.8, 0.1...)
+        probs = torch.softmax(outputs, dim=1)
+        
+        all_predicted.extend(predicted.cpu().numpy())
+        all_labels.extend(labels.cpu().numpy())
+        all_probabilities.extend(probs.cpu().numpy())
+        
         correct += (predicted == labels).sum().item()
         total += labels.size(0)
 
-    avg_loss = train_loss / total
+    avg_loss = running_loss / total
     accuracy = correct / total
-    return avg_loss, accuracy
+    
+    # Return 4 values
+    return all_predicted, all_labels, all_probabilities, avg_loss, accuracy
 
 
 def test(model, dataloader, criterion, device):
     model.eval()
-    test_loss = 0.0
+    running_loss = 0.0 # Renamed to avoid confusion with train_loss
     correct, total = 0, 0
+    all_predicted = []
+    all_labels = []
 
     with torch.no_grad():
         for inputs, labels in dataloader:
             inputs, labels = inputs.to(device), labels.to(device)
 
-            # Forward pass
             outputs = model(inputs)
             loss = criterion(outputs, labels)
 
-            # Track loss and accuracy
-            test_loss += loss.item() * inputs.size(0)
+            # Use running_loss here, not train_loss
+            running_loss += loss.item() * inputs.size(0)
             _, predicted = outputs.max(1)
+            
+            all_predicted.extend(predicted.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            
             correct += (predicted == labels).sum().item()
             total += labels.size(0)
 
-    avg_loss = test_loss / total
+    avg_loss = running_loss / total
     accuracy = correct / total
-    return avg_loss, accuracy
+    
+    return all_predicted, all_labels, avg_loss, accuracy
 
 def plot_metrics(train_metrics: Dict, test_metrics: Dict, metric_name: str):
     """
@@ -114,7 +133,7 @@ def plot_computational_graph(model: torch.nn.Module, input_size: tuple, filename
     print(f"Computational graph saved as {filename}")
 
 
-if __name__ == "__main__":
+if _name_ == "_main_":
 
     torch.manual_seed(42)
 
