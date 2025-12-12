@@ -29,8 +29,9 @@ def run_experiment(wandb_config=None, experiment_config=None):
         "num_epochs": 20,
         "learning_rate": 0.001,
         "hidden_dim": 300,
-        "output_dim": 8,
+        "output_dim": 11,
         "num_workers": 8,
+        "k_folds": 5,
     }
     
     # Merge with provided configs
@@ -64,13 +65,13 @@ def run_experiment(wandb_config=None, experiment_config=None):
                                 ])
     
     print("Loading datasets...")
-    data_train = ImageFolder("~/data/Master/MIT_split/train", transform=transformation)
-    #data_test = ImageFolder("~/data/Master/MIT_split/test", transform=transformation) 
+    data_train = ImageFolder("~/mcv/datasets/C3/2526/places_reduced/train", transform=transformation)
+    data_test = ImageFolder("~/mcv/datasets/C3/2526/places_reduced/val", transform=transformation) 
     
     kfold = KFold(n_splits=cfg.k_folds, shuffle=True, random_state=42)
 
     #train_loader = DataLoader(data_train, batch_size=cfg.batch_size, pin_memory=True, shuffle=True, num_workers=cfg.num_workers)
-    #test_loader = DataLoader(data_test, batch_size=cfg.batch_size, pin_memory=True, shuffle=False, num_workers=cfg.num_workers)
+    # test_loader = DataLoader(data_test, batch_size=cfg.batch_size, pin_memory=True, shuffle=False, num_workers=cfg.num_workers)
 
     # Store aggregated OOF (Out Of Fold) results for final metrics
     oof_val_preds = []
@@ -78,9 +79,12 @@ def run_experiment(wandb_config=None, experiment_config=None):
     oof_val_probs = []
     
     # Get Input Dimensions
-    C, H, W = np.array(data_train[0][0]).shape
+    C, H, W = np.asarray(data_train[0][0]).shape
     input_dim = C * H * W
     
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
     # Do a mapping so we can know to which fold corresponds each train sample
     indices_per_fold = []
     for fold_idx, (train_index, test_index) in enumerate(kfold.split(data_train)):
@@ -110,7 +114,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
         for epoch in tqdm.tqdm(range(cfg.num_epochs), desc=f"Fold {fold+1} Epochs"):
             
             # Train on fold's training set
-            _, _, train_loss, train_acc = train(model, train_loader, criterion, optimizer, device)
+            _, _, _, train_loss, train_acc = train(model, train_loader, criterion, optimizer, device)
             
             # Validate on fold's validation set
             _, _, _, val_loss, val_acc = test(model, val_loader, criterion, device)
@@ -162,7 +166,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
     ###########################################################################
     ##################### A PARTIR D'AQUÍ, CODI ANTIC #########################
     ###########################################################################
-    
+    '''
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -212,3 +216,6 @@ def run_experiment(wandb_config=None, experiment_config=None):
     roc_fig = metrics.plot_roc_curve()
     wandb.log({"ROC_curve": wandb.Image(roc_fig)})
     plt.close(roc_fig)
+    '''
+if __name__ == "__main__":
+    run_experiment()
