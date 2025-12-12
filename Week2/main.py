@@ -41,7 +41,7 @@ def train(model, dataloader, criterion, optimizer, device):
         
         all_predicted.extend(predicted.cpu().numpy())
         all_labels.extend(labels.cpu().numpy())
-        all_probabilities.extend(probs.cpu().numpy())
+        all_probabilities.extend(probs.detach().cpu().numpy())
         
         correct += (predicted == labels).sum().item()
         total += labels.size(0)
@@ -59,6 +59,7 @@ def test(model, dataloader, criterion, device):
     correct, total = 0, 0
     all_predicted = []
     all_labels = []
+    all_probabilities = []
 
     with torch.no_grad():
         for inputs, labels in dataloader:
@@ -71,8 +72,12 @@ def test(model, dataloader, criterion, device):
             running_loss += loss.item() * inputs.size(0)
             _, predicted = outputs.max(1)
             
+            # Get Soft Probabilities
+            probs = torch.softmax(outputs, dim=1)
+            
             all_predicted.extend(predicted.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
+            all_probabilities.extend(probs.cpu().numpy())
             
             correct += (predicted == labels).sum().item()
             total += labels.size(0)
@@ -80,7 +85,7 @@ def test(model, dataloader, criterion, device):
     avg_loss = running_loss / total
     accuracy = correct / total
     
-    return all_predicted, all_labels, avg_loss, accuracy
+    return all_predicted, all_labels, all_probabilities, avg_loss, accuracy
 
 def plot_metrics(train_metrics: Dict, test_metrics: Dict, metric_name: str):
     """
@@ -133,7 +138,7 @@ def plot_computational_graph(model: torch.nn.Module, input_size: tuple, filename
     print(f"Computational graph saved as {filename}")
 
 
-if _name_ == "_main_":
+if __name__ == "_main_":
 
     torch.manual_seed(42)
 
