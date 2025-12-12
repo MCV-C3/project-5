@@ -14,7 +14,7 @@ from sklearn.model_selection import KFold
 
 from models import SimpleModel
 from main import train, test, plot_computational_graph, plot_metrics
-from metrics import MetricsComputer
+from metrics import FoldMetrics
 
 def run_experiment(wandb_config=None, experiment_config=None):
     # Default configurations
@@ -142,80 +142,10 @@ def run_experiment(wandb_config=None, experiment_config=None):
     # COMPUTE MORE COMPLEX METRICS #
     ################################
 
-    metrics = MetricsComputer(y_pred_train=oof_val_preds, y_pred_test=None, 
-                                y_true_train=oof_val_labels, y_true_test=None,
-                                probas_train=oof_val_probs, probas_test=None, 
-                                indices_per_fold=indices_per_fold)
+    # Metrics calculation
+    metrics = FoldMetrics(final_val_labels, final_val_preds, indices_per_fold)
+    metrics_dict = metrics.compute()
+    wandb.log(metrics_dict)        
     
-    # BASIC METRICS (PRECISION, RECALL, F1, ACCURACY, AUC)
-    metrics.compute_all_metrics()
-    metrics_dict = metrics.get_all_metrics_dict()
-    wandb.log(metrics_dict)
-    
-    #CONFMAT
-    confmat_fig = metrics.plot_confusion_matrix()
-    wandb.log({"confusion_matrix": wandb.Image(confmat_fig)})
-    plt.close(confmat_fig)
-    
-    # ROC CURVE
-    roc_fig = metrics.plot_roc_curve()
-    wandb.log({"ROC_curve": wandb.Image(roc_fig)})
-    plt.close(roc_fig)
-        
-        
-    ###########################################################################
-    ##################### A PARTIR D'AQUÍ, CODI ANTIC #########################
-    ###########################################################################
-    '''
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    model = SimpleModel(input_d=C*H*W, hidden_d=cfg.hidden_dim, output_d=cfg.output_dim)
-    #plot_computational_graph(model, input_size=(1, C*H*W))  # Batch size of 1, input_dim=10
-
-    model = model.to(device)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
-    NUM_EPOCHS = cfg.num_epochs
-
-    train_losses, train_accuracies = [], []
-    test_losses, test_accuracies = [], []
-    
-    for epoch in tqdm.tqdm(range(NUM_EPOCHS), desc="TRAINING THE MODEL"):
-        train_loss, train_accuracy = train(model, train_loader, criterion, optimizer, device)
-        test_loss, test_accuracy = test(model, test_loader, criterion, device)
-
-        train_losses.append(train_loss)
-        train_accuracies.append(train_accuracy)
-        test_losses.append(test_loss)
-        test_accuracies.append(test_accuracy)
-
-        print(f"Epoch {epoch + 1}/{NUM_EPOCHS} - "
-              f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, "
-              f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
-
-    # Plot results
-    plot_metrics({"loss": train_losses, "accuracy": train_accuracies}, {"loss": test_losses, "accuracy": test_accuracies}, "loss")
-    plot_metrics({"loss": train_losses, "accuracy": train_accuracies}, {"loss": test_losses, "accuracy": test_accuracies}, "accuracy")
-    
-    metrics = MetricsComputer(y_pred_train, y_pred_test, 
-                                   labels_train, labels_test,
-                                   y_probas_train, y_probas_test, indices_per_fold)
-    
-    # BASIC METRICS (PRECISION, RECALL, F1, ACCURACY, AUC)
-    metrics.compute_all_metrics()
-    metrics_dict = metrics.get_all_metrics_dict()
-    wandb.log(metrics_dict)
-    
-    #CONFMAT
-    confmat_fig = metrics.plot_confusion_matrix()
-    wandb.log({"confusion_matrix": wandb.Image(confmat_fig)})
-    plt.close(confmat_fig)
-    
-    # ROC CURVE
-    roc_fig = metrics.plot_roc_curve()
-    wandb.log({"ROC_curve": wandb.Image(roc_fig)})
-    plt.close(roc_fig)
-    '''
 if __name__ == "__main__":
     run_experiment()
