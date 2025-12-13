@@ -22,12 +22,15 @@ class SimpleModel(nn.Module):
         self.activation = nn.ReLU()
 
 
-    def forward(self, x):
+    def forward(self, x, return_features=False):
         x = x.view(x.shape[0], -1)
         x = self.layer1(x)
         x = self.activation(x)
         x = self.layer2(x)
         x = self.activation(x)
+
+        if return_features:
+            return x
 
         x = self.output_layer(x)
         
