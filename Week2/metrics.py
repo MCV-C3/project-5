@@ -7,6 +7,83 @@ from sklearn.metrics import (
     confusion_matrix, roc_auc_score, roc_curve, ConfusionMatrixDisplay,
 )
 
+# --- PLOTTING FUNCTION ---
+def plot_mean_std_curve(data_dict, title, x_label, y_label):
+    """
+    Plots multiple curves (e.g. Train vs Val) with Mean lines and Std Dev shading.
+    
+    Args:
+        data_dict (dict): {
+            'Train': { epoch1: [v1, v2..], epoch2: ... },
+            'Validation': { epoch1: [v1, v2..], epoch2: ... }
+        }
+    """
+    plt.style.use('seaborn-v0_8-whitegrid')
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Define colors for Train vs Validation
+    styles = {
+        'Train':      {'color': '#1f77b4', 'marker': 'o', 'label': 'Train'},      # Blue
+        'Validation': {'color': '#d62728', 'marker': 's', 'label': 'Validation'}  # Red
+    }
+    
+    # Iterate over 'Train' and 'Validation'
+    for name, metrics_per_x in data_dict.items():
+        
+        # 1. Prepare Data
+        sorted_x = sorted(metrics_per_x.keys())
+        means = []
+        stds = []
+        
+        for x_val in sorted_x:
+            values = np.array(metrics_per_x[x_val])
+            means.append(np.mean(values))
+            stds.append(np.std(values))
+            
+        means = np.array(means)
+        stds = np.array(stds)
+        x_vals = np.array(sorted_x)
+        
+        # Get style
+        style = styles.get(name, {'color': 'black', 'marker': 'x', 'label': name})
+        
+        # 2. Plot MEAN Line
+        ax.plot(x_vals, means, 
+                color=style['color'], 
+                marker=style['marker'], 
+                markersize=5, 
+                linewidth=2, 
+                label=f"{name} Mean",
+                zorder=3)
+        
+        # 3. Plot SHADED BAND
+        ax.fill_between(x_vals, 
+                        means - stds, 
+                        means + stds, 
+                        color=style['color'], 
+                        alpha=0.15, # Light transparency
+                        zorder=2)
+
+    # --- Axes and Legend ---
+    ax.set_xlabel(x_label, fontsize=12, labelpad=10)
+    ax.set_ylabel(y_label, fontsize=12, labelpad=10)
+    ax.set_title(title, fontsize=14, fontweight='bold', pad=15)
+    
+    # Force integer ticks for epochs
+    if len(x_vals) > 0:
+        ax.xaxis.get_major_locator().set_params(integer=True)
+
+    legend = ax.legend(frameon=True, fancybox=True, framealpha=0.9, shadow=True, loc='best')
+    legend.get_frame().set_facecolor('white')
+
+    ax.grid(True, which='major', linestyle='--', linewidth=0.7, alpha=0.7)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    
+    plt.tight_layout()
+    return fig
+
 class BaseMetricsComputer:
     """
     Base class for computing core classification metrics.
@@ -205,3 +282,37 @@ class FoldMetrics:
             summary[f'fold_{metric}_mean'] = np.mean(values)
             summary[f'fold_{metric}_std'] = np.std(values)
         return summary
+    
+    def get_training_plots(self, history):
+        "Returns the plots for train and validation losses and accuracies during training."
+        # 1. Format Data for Plotting Function
+        # Structure: {'Train': {epoch: [folds...]}, 'Validation': {epoch: [folds...]}}
+        acc_data_plot = {'Train': {}, 'Validation': {}}
+        loss_data_plot = {'Train': {}, 'Validation': {}}
+        
+        for epoch, metrics in history.items():
+            ep_idx = epoch + 1 # Start X-axis at 1
+            
+            acc_data_plot['Train'][ep_idx] = metrics['train_acc']
+            acc_data_plot['Validation'][ep_idx] = metrics['val_acc']
+            
+            loss_data_plot['Train'][ep_idx] = metrics['train_loss']
+            loss_data_plot['Validation'][ep_idx] = metrics['val_loss']
+
+        # 2. Generate Accuracy Plot (Both Train & Val)
+        fig_acc = plot_mean_std_curve(
+            acc_data_plot, 
+            title="Accuracy Evolution", 
+            x_label="Epoch", 
+            y_label="Accuracy"
+        )
+        
+        # 3. Generate Loss Plot (Both Train & Val)
+        fig_loss = plot_mean_std_curve(
+            loss_data_plot, 
+            title="Loss Evolution", 
+            x_label="Epoch", 
+            y_label="Loss"
+        )
+        
+        return fig_acc, fig_loss

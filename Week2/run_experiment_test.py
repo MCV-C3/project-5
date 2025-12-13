@@ -48,7 +48,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
     wandb.init(
         project=wandb_config["project"],
         entity=wandb_config["entity"],
-        config=experiment_config,
+        config=experiment_config
     )
 
     cfg = wandb.config
@@ -101,7 +101,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
         #      f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
         wandb.log({
             f"train_loss": train_loss,
-            f"rain_acc": train_accuracy,
+            f"train_acc": train_accuracy,
             f"test_loss": test_loss,
             f"test_acc": test_accuracy,
             "epoch": epoch
@@ -119,12 +119,14 @@ def run_experiment(wandb_config=None, experiment_config=None):
     wandb.log(metrics_dict)
     
     #CONFMAT
-    confmat_fig = metrics.compute_confusion_matrix()
+    confmat_fig = metrics.plot_confusion_matrix()
     wandb.log({"confusion_matrix": wandb.Image(confmat_fig)})
     
     # ROC CURVE
-    roc_fig = metrics.compute_auc()
+    roc_fig = metrics.plot_roc_curve()
     wandb.log({"ROC_curve": wandb.Image(roc_fig)})
+    
+    wandb.finish()
         
 if __name__ == "__main__":
     run_experiment()
