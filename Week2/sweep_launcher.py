@@ -31,7 +31,10 @@ sweep_config = {
         }, 
         'num_workers': {
             'values': [8]
-        }
+        },
+        'task_type': {
+            'values': ['mlp_svm']
+        },
     },
     'metric': {
         'name': 'test_accuracy',
