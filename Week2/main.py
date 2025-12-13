@@ -138,7 +138,7 @@ def plot_computational_graph(model: torch.nn.Module, input_size: tuple, filename
     print(f"Computational graph saved as {filename}")
 
 
-if __name__ == "_main_":
+if __name__ == "__main__":
 
     torch.manual_seed(42)
 

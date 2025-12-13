@@ -23,7 +23,7 @@ def generate_image_patches_db(in_directory,out_directory,patch_size=64):
     for class_dir in os.listdir(os.path.join(in_directory,split_dir)):
       if not os.path.exists(os.path.join(out_directory,split_dir,class_dir)):
         os.makedirs(os.path.join(out_directory,split_dir,class_dir))
-  
+        
       for imname in os.listdir(os.path.join(in_directory,split_dir,class_dir)):
         count += 1
         im = Image.open(os.path.join(in_directory,split_dir,class_dir,imname))

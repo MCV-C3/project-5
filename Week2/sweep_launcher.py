@@ -1,5 +1,5 @@
 import wandb
-from run_experiment import run_experiment
+from run_experiment_cross_val import run_experiment
 
 # Wandb configuration
 wandb_config = {
@@ -24,7 +24,7 @@ sweep_config = {
             'values': [300]
         },
         'output_dim': {
-            'values': [8]
+            'values': [11]
         },
         'num_epochs': {
             'values': [20]

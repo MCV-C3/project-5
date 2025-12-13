@@ -124,10 +124,11 @@ def run_experiment(wandb_config=None, experiment_config=None):
 
             # Log per-fold basic metrics for each epoch
             wandb.log({
-                f"fold_{fold}_train_loss": train_loss,
-                f"fold_{fold}_train_acc": train_acc,
-                f"fold_{fold}_val_loss": val_loss,
-                f"fold_{fold}_val_acc": val_acc,
+                "train_loss": train_loss,
+                "train_acc": train_acc,
+                "val_loss": val_loss,
+                "val_acc": val_acc,
+                "fold_id": fold+1,
                 "epoch": epoch
             })
 
@@ -143,7 +144,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
     ################################
 
     # Metrics calculation
-    metrics = FoldMetrics(final_val_labels, final_val_preds, indices_per_fold)
+    metrics = FoldMetrics(oof_val_labels, oof_val_preds, indices_per_fold)
     metrics_dict = metrics.compute()
     wandb.log(metrics_dict)        
     
