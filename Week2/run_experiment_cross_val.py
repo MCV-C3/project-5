@@ -69,7 +69,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
 
     full_targets = np.array(data_train.targets)
     oof_preds_full = np.zeros(len(data_train), dtype=int)
-    svm_oof_preds_full = np.zeros(len(data_train), dtype=int) if experiment_config["task_type"] == "mlp_svm" else None
+    svm_oof_preds_full = np.zeros(len(data_train), dtype=int) if cfg.task_type == "mlp_svm" else None
     
     C, H, W = np.asarray(data_train[0][0]).shape
     input_dim = C * H * W
