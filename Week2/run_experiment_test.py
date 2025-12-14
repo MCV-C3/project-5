@@ -78,7 +78,13 @@ def run_experiment(wandb_config=None, experiment_config=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if cfg.model_type == 'cnn':
-        model = SimpleCNN(in_channels = C, hidden_channels=cfg.hidden_dim, output_d=cfg.output_dim, img_size= H * W)
+        # img_size must be the side length (assumes square resize)
+        # Get optional CNN-specific hyperparameters from config
+        conv_stride = getattr(cfg, 'conv_stride', 2)
+        kernel_size = getattr(cfg, 'kernel_size', 5)
+        
+        model = SimpleCNN(in_channels=C, hidden_channels=cfg.hidden_dim, output_d=cfg.output_dim, 
+                          img_size=H, conv_stride=conv_stride, kernel_size=kernel_size)
     else:
         model = SimpleModel(input_d=input_dim, hidden_d=cfg.hidden_dim, output_d=cfg.output_dim)
     #plot_computational_graph(model, input_size=(1, C*H*W))  # Batch size of 1, input_dim=10

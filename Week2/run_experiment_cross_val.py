@@ -12,7 +12,7 @@ import wandb
 from sklearn.model_selection import KFold
 import collections
 
-from models import SimpleModel
+from models import SimpleModel, SimpleCNN
 from main import train, test
 from metrics import FoldMetrics
 from svm_utils import train_svm
@@ -34,6 +34,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
         "num_workers": 8,
         "k_folds": 5,
         "task_type": "mlp_only",
+        "model_type": "mlp",
     }
     
     # Merge configs
@@ -95,7 +96,15 @@ def run_experiment(wandb_config=None, experiment_config=None):
         val_loader = DataLoader(val_sub, batch_size=cfg.batch_size, shuffle=False, 
                                 num_workers=cfg.num_workers, pin_memory=True)
 
-        model = SimpleModel(input_d=input_dim, hidden_d=cfg.hidden_dim, output_d=cfg.output_dim)
+        if cfg.model_type == 'cnn':
+            # Get optional CNN-specific hyperparameters from config
+            conv_stride = getattr(cfg, 'conv_stride', 2)
+            kernel_size = getattr(cfg, 'kernel_size', 5)
+            
+            model = SimpleCNN(in_channels=C, hidden_channels=cfg.hidden_dim, output_d=cfg.output_dim, 
+                              img_size=H, conv_stride=conv_stride, kernel_size=kernel_size)
+        else:
+            model = SimpleModel(input_d=input_dim, hidden_d=cfg.hidden_dim, output_d=cfg.output_dim)
         model = model.to(device)
         
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)

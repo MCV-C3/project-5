@@ -38,32 +38,41 @@ class SimpleModel(nn.Module):
 
 class SimpleCNN(nn.Module):
 
-    def __init__(self, in_channels: int, hidden_channels: int, output_d: int, img_size: int):
+    def __init__(self, in_channels: int, hidden_channels: int, output_d: int, img_size: int, 
+                 conv_stride: int = 2, kernel_size: int = 5):
         super(SimpleCNN, self).__init__()
 
         self.hidden_channels = hidden_channels
         self.output_d = output_d
+        self.conv_stride = conv_stride
 
         # --- Layer Definitions ---
-        # Layer 1: Conv (preserves size) + Pool (halves size)
-        self.layer1 = nn.Conv2d(in_channels, hidden_channels, kernel_size=3, padding=1)
-        # Layer 2: Conv (preserves size) + Pool (halves size)
-        self.layer2 = nn.Conv2d(hidden_channels, hidden_channels * 2, kernel_size=3, padding=1)
+        # Layer 1: Conv with configurable stride + Pool
+        padding = kernel_size // 2
+        self.layer1 = nn.Conv2d(in_channels, hidden_channels, kernel_size=kernel_size, 
+                                stride=conv_stride, padding=padding)
+        # Layer 2: Conv with configurable stride + Pool
+        self.layer2 = nn.Conv2d(hidden_channels, hidden_channels, 
+                                kernel_size=kernel_size, stride=conv_stride, padding=padding)
         
         self.activation = nn.ReLU()
-        self.pool = nn.MaxPool2d(2, 2) 
+        self.pool = nn.MaxPool2d(2, 2)
+        
+        # Calculate total spatial reduction: (stride * pool) for each layer
+        spatial_reduction = (conv_stride * 2) ** 2  # Each layer: stride*2 (conv+pool)
+        final_size = int(img_size / (conv_stride * 2 * conv_stride * 2))
 
         # Final classification layer
-        self.output_layer = nn.Linear(hidden_channels * 2 * (int(img_size / 4) * int(img_size / 4)), output_d)
+        self.output_layer = nn.Linear(hidden_channels * (final_size * final_size), output_d)
 
 
     def forward(self, x):        
-        # Layer 1
+        # Layer 1: Conv(stride=2) -> ReLU -> Pool
         x = self.layer1(x)
         x = self.activation(x)
         x = self.pool(x)
 
-        # Layer 2
+        # Layer 2: Conv(stride=2) -> ReLU -> Pool
         x = self.layer2(x)
         x = self.activation(x)
         x = self.pool(x)

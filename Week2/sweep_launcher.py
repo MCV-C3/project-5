@@ -143,6 +143,12 @@ cnn = {
         },
         'model_type':{
             'values':['cnn']
+        },
+        'conv_stride': {
+            'values': [1, 2, 3]
+        },
+        'kernel_size': {
+            'values': [3, 5, 7]
         }
     },
     'metric': {
