@@ -32,7 +32,10 @@ baseline_experiment = {
         }, 
         'num_workers': {
             'values': [8]
-        }
+        },
+        'task_type': {
+            'values': ['mlp_only']
+        },
     },
     'metric': {
         'name': 'test_accuracy',
@@ -40,7 +43,7 @@ baseline_experiment = {
     }
 }
 
-image_size = {
+image_size_experiment = {
     'method': 'grid',
     'parameters': {
         'image_size': {
@@ -74,11 +77,11 @@ image_size = {
     }
 }
 
-svm_mlp = {
+svm_mlp_experiment = {
     'method': 'grid',
     'parameters': {
         'image_size': {
-            'values': [(16,16)]
+            'values': [(4, 4)]
         },
         'batch_size': {
             'values': [256]
@@ -112,6 +115,6 @@ def run_experiment_with_wandb_config():
     """Wrapper function to pass wandb_config to run_experiment."""
     run_experiment(wandb_config=wandb_config)
 
-sweep_id = wandb.sweep(image_size, project=wandb_config["project"], entity=wandb_config["entity"])
+sweep_id = wandb.sweep(svm_mlp_experiment, project=wandb_config["project"], entity=wandb_config["entity"])
 print(f"Initiated sweep with ID: {sweep_id}")
 wandb.agent(sweep_id, function=run_experiment)

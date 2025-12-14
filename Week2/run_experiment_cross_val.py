@@ -144,27 +144,38 @@ def run_experiment(wandb_config=None, experiment_config=None):
     ############## METRICS CALCULATION ##############
     #################################################
     
-    metrics_mlp = FoldMetrics(full_targets, oof_preds_full, indices_per_fold)
-    metrics_mlp_dict = metrics_mlp.compute()
-    summary = metrics_mlp.get_summary()
-    wandb.log(metrics_mlp_dict)
+    # Choose which predictions to use for final metrics
+    if cfg.task_type == "mlp_svm":
+        # Use SVM predictions for metrics
+        final_preds = svm_oof_preds_full
+        metrics_prefix = "mlp_svm_"
+    else:
+        # Use MLP predictions for metrics
+        final_preds = oof_preds_full
+        metrics_prefix = "mlp_"
+    
+    metrics = FoldMetrics(full_targets, final_preds, indices_per_fold)
+    metrics_dict = metrics.compute()
+    summary = metrics.get_summary()
+    
+    # Add prefix to metric names if using SVM
+    if metrics_prefix:
+        metrics_dict = {f"{metrics_prefix}{k}": v for k, v in metrics_dict.items()}
+        summary = {f"{metrics_prefix}{k}": v for k, v in summary.items()}
+    
+    wandb.log(metrics_dict)
     wandb.log(summary)
     
-    fig_acc, fig_loss = metrics_mlp.get_training_plots(history)
+    fig_acc, fig_loss = metrics.get_training_plots(history)
 
-    # 4. Log Images to WandB
+    # Log Images to WandB
     wandb.log({
-        "aggregated_accuracy_plot": wandb.Image(fig_acc),
-        "aggregated_loss_plot": wandb.Image(fig_loss)
+        f"{metrics_prefix}aggregated_accuracy_plot": wandb.Image(fig_acc),
+        f"{metrics_prefix}aggregated_loss_plot": wandb.Image(fig_loss)
     })
     
     plt.close(fig_acc)
-    plt.close(fig_loss)
-    
-    if cfg.task_type == "mlp_svm":
-        metrics_svm = FoldMetrics(full_targets, svm_oof_preds_full, indices_per_fold)
-        metrics_svm_dict = metrics_svm.compute()
-        wandb.log({f"svm_{k}": v for k, v in metrics_svm_dict.items()})    
+    plt.close(fig_loss)    
     
 if __name__ == "__main__":
     run_experiment()
