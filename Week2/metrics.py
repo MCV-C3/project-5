@@ -8,7 +8,7 @@ from sklearn.metrics import (
 )
 
 # --- PLOTTING FUNCTION ---
-def plot_mean_std_curve(data_dict, title, x_label, y_label):
+def plot_mean_std_curve(data_dict, title, x_label, y_label, dim = None):
     """
     Plots multiple curves (e.g. Train vs Val) with Mean lines and Std Dev shading.
     
@@ -69,6 +69,9 @@ def plot_mean_std_curve(data_dict, title, x_label, y_label):
     ax.set_xlabel(x_label, fontsize=12, labelpad=10)
     ax.set_ylabel(y_label, fontsize=12, labelpad=10)
     ax.set_title(title, fontsize=14, fontweight='bold', pad=15)
+    
+    if dim != None:
+        ax.set_ylim(dim[0], dim[1])
     
     # Force integer ticks for epochs
     if len(x_vals) > 0:
@@ -312,7 +315,7 @@ class FoldMetrics:
             loss_data_plot, 
             title="Loss Evolution", 
             x_label="Epoch", 
-            y_label="Loss"
+            y_label="Accuracy"
         )
         
         return fig_acc, fig_loss
