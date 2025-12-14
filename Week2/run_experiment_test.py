@@ -14,6 +14,7 @@ import wandb
 from models import SimpleModel
 from main import train, test, plot_computational_graph, plot_metrics
 from metrics import TestMetrics
+from svm_utils import train_svm
 
 def run_experiment(wandb_config=None, experiment_config=None):
     # Default configurations
@@ -108,14 +109,33 @@ def run_experiment(wandb_config=None, experiment_config=None):
         })
         
     final_test_pred, final_test_true, final_test_probs, _, _ = test(model, test_loader, criterion, device)
+    
+    if cfg.task_type == "mlp_svm":
+        svm_preds, _, svm_acc = train_svm(train_loader, test_loader, model, device)
+        wandb.log({"svm_fold_acc": svm_acc})
 
     # Plot results
     #plot_metrics({"loss": train_losses, "accuracy": train_accuracies}, {"loss": test_losses, "accuracy": test_accuracies}, "loss")
     #plot_metrics({"loss": train_losses, "accuracy": train_accuracies}, {"loss": test_losses, "accuracy": test_accuracies}, "accuracy")
     
+    # Choose which predictions to use for final metrics
+    if cfg.task_type == "mlp_svm":
+        # Use SVM predictions for metrics
+        final_preds = svm_preds
+        metrics_prefix = "mlp_svm_"
+    else:
+        # Use MLP predictions for metrics
+        final_preds = final_test_pred
+        metrics_prefix = "mlp_"
+    
     # Calculate metrics
-    metrics = TestMetrics(final_test_true, final_test_pred, final_test_probs)
+    metrics = TestMetrics(final_test_true, final_preds, final_test_probs)
     metrics_dict = metrics.compute()
+    
+    # Add prefix to metric names if using SVM
+    if metrics_prefix:
+        metrics_dict = {f"{metrics_prefix}{k}": v for k, v in metrics_dict.items()}
+
     wandb.log(metrics_dict)
     
     #CONFMAT

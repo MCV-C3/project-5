@@ -1,6 +1,6 @@
 import wandb
-from run_experiment_cross_val import run_experiment
-#from run_experiment_test import run_experiment
+#from run_experiment_cross_val import run_experiment
+from run_experiment_test import run_experiment
 
 # Wandb configuration
 wandb_config = {
@@ -32,10 +32,7 @@ baseline_experiment = {
         }, 
         'num_workers': {
             'values': [8]
-        },
-        'task_type': {
-            'values': ['mlp_only']
-        },
+        }
     },
     'metric': {
         'name': 'test_accuracy',
@@ -43,11 +40,11 @@ baseline_experiment = {
     }
 }
 
-image_size_experiment = {
+image_size = {
     'method': 'grid',
     'parameters': {
         'image_size': {
-            'values': [(256,256)]
+            'values': [(2,2), (4,4), (8,8), (16, 16), (32, 32), (64, 64), (128, 128), (224, 224), (256, 256)]
         },
         'batch_size': {
             'values': [256]
@@ -77,11 +74,11 @@ image_size_experiment = {
     }
 }
 
-svm_mlp_experiment = {
+svm_mlp = {
     'method': 'grid',
     'parameters': {
         'image_size': {
-            'values': [(4, 4)]
+            'values': [(4,4)]
         },
         'batch_size': {
             'values': [256]
@@ -115,6 +112,6 @@ def run_experiment_with_wandb_config():
     """Wrapper function to pass wandb_config to run_experiment."""
     run_experiment(wandb_config=wandb_config)
 
-sweep_id = wandb.sweep(svm_mlp_experiment, project=wandb_config["project"], entity=wandb_config["entity"])
+sweep_id = wandb.sweep(svm_mlp, project=wandb_config["project"], entity=wandb_config["entity"])
 print(f"Initiated sweep with ID: {sweep_id}")
 wandb.agent(sweep_id, function=run_experiment)
