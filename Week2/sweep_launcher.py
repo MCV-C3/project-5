@@ -118,7 +118,7 @@ cnn = {
     'method': 'grid',
     'parameters': {
         'image_size': {
-            'values': [(4,4)]
+            'values': [(256,256)]
         },
         'batch_size': {
             'values': [256]
@@ -127,13 +127,13 @@ cnn = {
             'values': [0.001]
         },
         'hidden_dim': {
-            'values': [64]
+            'values': [32]
         },
         'output_dim': {
             'values': [11]
         },
         'num_epochs': {
-            'values': [30]
+            'values': [20]
         }, 
         'num_workers': {
             'values': [8]
