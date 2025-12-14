@@ -11,7 +11,7 @@ from torchviz import make_dot
 import tqdm
 import wandb
 
-from models import SimpleModel
+from models import SimpleModel, SimpleCNN
 from main import train, test, plot_computational_graph, plot_metrics
 from metrics import TestMetrics
 from svm_utils import train_svm
@@ -77,7 +77,10 @@ def run_experiment(wandb_config=None, experiment_config=None):
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = SimpleModel(input_d=input_dim, hidden_d=cfg.hidden_dim, output_d=cfg.output_dim)
+    if cfg.model_type == 'cnn':
+        model = SimpleCNN(in_channels = C, hidden_channels=cfg.hidden_dim, output_d=cfg.output_dim, img_size= H * W)
+    else:
+        model = SimpleModel(input_d=input_dim, hidden_d=cfg.hidden_dim, output_d=cfg.output_dim)
     #plot_computational_graph(model, input_size=(1, C*H*W))  # Batch size of 1, input_dim=10
 
     model = model.to(device)

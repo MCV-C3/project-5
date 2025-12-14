@@ -67,6 +67,9 @@ image_size = {
         'task_type': {
             'values': ['mlp_only']
         },
+        'model_type':{
+            'values':['mlp']
+        }
     },
     'metric': {
         'name': 'test_accuracy',
@@ -101,6 +104,46 @@ svm_mlp = {
         'task_type': {
             'values': ['mlp_svm']
         },
+        'model_type':{
+            'values':['mlp']
+        }
+    },
+    'metric': {
+        'name': 'test_accuracy',
+        'goal': 'maximize'   
+    }
+}
+
+cnn = {
+    'method': 'grid',
+    'parameters': {
+        'image_size': {
+            'values': [(4,4)]
+        },
+        'batch_size': {
+            'values': [256]
+        },
+        'learning_rate': {
+            'values': [0.001]
+        },
+        'hidden_dim': {
+            'values': [64]
+        },
+        'output_dim': {
+            'values': [11]
+        },
+        'num_epochs': {
+            'values': [30]
+        }, 
+        'num_workers': {
+            'values': [8]
+        },
+        'task_type': {
+            'values': ['mlp_only']
+        },
+        'model_type':{
+            'values':['cnn']
+        }
     },
     'metric': {
         'name': 'test_accuracy',
@@ -112,6 +155,6 @@ def run_experiment_with_wandb_config():
     """Wrapper function to pass wandb_config to run_experiment."""
     run_experiment(wandb_config=wandb_config)
 
-sweep_id = wandb.sweep(svm_mlp, project=wandb_config["project"], entity=wandb_config["entity"])
+sweep_id = wandb.sweep(cnn, project=wandb_config["project"], entity=wandb_config["entity"])
 print(f"Initiated sweep with ID: {sweep_id}")
 wandb.agent(sweep_id, function=run_experiment)
