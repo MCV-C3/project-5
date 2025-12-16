@@ -104,7 +104,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
             model = SimpleCNN(in_channels=C, hidden_channels=cfg.hidden_dim, output_d=cfg.output_dim, 
                               img_size=H, conv_stride=conv_stride, kernel_size=kernel_size)
         else:
-            model = SimpleModel(input_d=input_dim, hidden_d=cfg.hidden_dim, output_d=cfg.output_dim)
+            model = SimpleModel(input_d=input_dim, hidden_d=cfg.hidden_dim, output_d=cfg.output_dim, num_hidden_layers=cfg.num_hidden_layers)
         model = model.to(device)
         
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)

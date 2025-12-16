@@ -6,17 +6,25 @@ from typing import *
 
 class SimpleModel(nn.Module):
 
-    def __init__(self, input_d: int, hidden_d: int, output_d: int):
+    def __init__(self, input_d: int, hidden_d: int, output_d: int, num_hidden_layers: int):
 
         super(SimpleModel, self).__init__()
 
         self.input_d = input_d
         self.hidden_d = hidden_d
         self.output_d = output_d
+        #self.num_hidden_layers = num_hidden_layers
 
 
+        # First hidden layer
         self.layer1 = nn.Linear(input_d, hidden_d)
-        self.layer2 = nn.Linear(hidden_d, hidden_d)
+        #self.layer2 = nn.Linear(hidden_d, hidden_d)
+        # Module to match the number of hidden layers requested in num_hidden_layers
+        self.hidden_layers = nn.ModuleList([
+            nn.Linear(hidden_d, hidden_d) 
+            for _ in range(num_hidden_layers - 1)
+        ])
+        
         self.output_layer = nn.Linear(hidden_d, output_d)
 
         self.activation = nn.ReLU()
@@ -26,8 +34,10 @@ class SimpleModel(nn.Module):
         x = x.view(x.shape[0], -1)
         x = self.layer1(x)
         x = self.activation(x)
-        x = self.layer2(x)
-        x = self.activation(x)
+        
+        for layer in self.hidden_layers:
+            x = layer(x)
+            x = self.activation(x)
 
         if return_features:
             return x
