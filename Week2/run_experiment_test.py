@@ -14,7 +14,7 @@ import wandb
 from models import SimpleModel, SimpleCNN
 from main import train, test, plot_computational_graph, plot_metrics
 from metrics import TestMetrics
-from svm_utils import train_svm
+from svm_utils import train_svm, train_svm_patches
 
 def run_experiment(wandb_config=None, experiment_config=None):
     # Default configurations
@@ -29,9 +29,15 @@ def run_experiment(wandb_config=None, experiment_config=None):
         "num_epochs": 20,
         "learning_rate": 0.001,
         "hidden_dim": 300,
+        "encoding": "fisher",
+        "pca":False,
         "output_dim": 11,
         "num_workers": 8,
         "k_folds": 5,
+        "task_type": "mlp_svm", # mlp_svm, mlp_only
+        "model_type": "mlp",
+        "patches_lvl": 1,
+        "patches_method":"vote",
     }
     
     # Merge with provided configs
@@ -58,20 +64,29 @@ def run_experiment(wandb_config=None, experiment_config=None):
     
     torch.manual_seed(42)
 
+    image_size = (224//2**cfg.patches_lvl, 224//2**cfg.patches_lvl) if cfg.patches_lvl > 0 else cfg.image_size
     transformation  = F.Compose([
                                     F.ToImage(),
                                     F.ToDtype(torch.float32, scale=True),
-                                    F.Resize(size=cfg.image_size),
+                                    F.Resize(size=image_size),
                                 ])
     
     print("Loading datasets...")
-    data_train = ImageFolder("~/mcv/datasets/C3/2526/places_reduced/train", transform=transformation)
-    data_test = ImageFolder("~/mcv/datasets/C3/2526/places_reduced/val", transform=transformation) 
+    if cfg.patches_lvl > 0:
+        data_train = ImageFolder(f"~/data/places_reduced_patches_lvl_{cfg.patches_lvl}/train", transform=transformation)
+        data_test = ImageFolder(f"~/data/places_reduced_patches_lvl_{cfg.patches_lvl}/test", transform=transformation)
+        num_patches = 4 ** cfg.patches_lvl
+    else:
+        data_train = ImageFolder("~/mcv/datasets/C3/2526/places_reduced/train", transform=transformation)
+        data_test = ImageFolder("~/mcv/datasets/C3/2526/places_reduced/val", transform=transformation) 
 
     train_loader = DataLoader(data_train, batch_size=cfg.batch_size, pin_memory=True, shuffle=True, num_workers=cfg.num_workers)
     test_loader = DataLoader(data_test, batch_size=cfg.batch_size, pin_memory=True, shuffle=False, num_workers=cfg.num_workers)
     
     # Get Input Dimensions
+    
+    full_targets = np.array(data_train.targets)
+
     C, H, W = np.asarray(data_train[0][0]).shape
     input_dim = C * H * W
     
@@ -119,9 +134,17 @@ def run_experiment(wandb_config=None, experiment_config=None):
         
     final_test_pred, final_test_true, final_test_probs, _, _ = test(model, test_loader, criterion, device)
     
+    use_fisher = True if cfg.encoding == "fisher" else False
+    use_pca = cfg.pca
+    
     if cfg.task_type == "mlp_svm":
-        svm_preds, _, svm_acc = train_svm(train_loader, test_loader, model, device)
-        wandb.log({"svm_fold_acc": svm_acc})
+        if cfg.patches_lvl == 0:
+            svm_preds, _, svm_acc = train_svm(train_loader, test_loader, model, device, fisher=use_fisher, pca=use_pca)
+            wandb.log({"svm_fold_acc": svm_acc})
+        else:
+            print("train_svm_patches")
+            svm_preds, _, svm_acc = train_svm_patches(train_loader, test_loader, model, device, patches_lvl=cfg.patches_lvl, method=cfg.patches_method, fisher=use_fisher, pca=use_pca)
+
 
     # Plot results
     #plot_metrics({"loss": train_losses, "accuracy": train_accuracies}, {"loss": test_losses, "accuracy": test_accuracies}, "loss")
@@ -136,6 +159,28 @@ def run_experiment(wandb_config=None, experiment_config=None):
         # Use MLP predictions for metrics
         final_preds = final_test_pred
         metrics_prefix = "mlp_"
+    
+    if cfg.patches_lvl > 0:
+        print("Converting results from Patch-level to Image-level...")
+        final_test_probs = np.array(final_test_probs)
+                
+        full_targets = full_targets[::num_patches]
+        if cfg.task_type != "mlp_svm":
+            final_preds = final_preds[::num_patches]
+        final_test_true = final_test_true[::num_patches]
+        
+        probs_grouped = final_test_probs.reshape(-1, num_patches, final_test_probs.shape[1])
+        final_test_probs = np.sum(probs_grouped, axis=1)
+        final_test_probs = final_test_probs / final_test_probs.sum(axis=1, keepdims=True)
+        
+        # new_indices_per_fold = []
+        # for val_ids in indices_per_fold:
+        #     img_ids = val_ids // num_patches
+        #     new_indices_per_fold.append(np.unique(img_ids))
+            
+        # indices_per_fold = new_indices_per_fold
+        
+        print(f"New shapes -> Targets: {full_targets.shape}, Preds: {final_preds.shape}")    
     
     # Calculate metrics
     metrics = TestMetrics(final_test_true, final_preds, final_test_probs)
@@ -158,4 +203,22 @@ def run_experiment(wandb_config=None, experiment_config=None):
     wandb.finish()
         
 if __name__ == "__main__":
-    run_experiment()
+    patches_lvl = 1
+    image_size = (224//2**patches_lvl, 224//2**patches_lvl)
+    experiment_config = {
+        "image_size": image_size,
+        "batch_size": 1024,
+        "num_epochs": 20,
+        "learning_rate": 0.001,
+        "hidden_dim": 300,
+        "output_dim": 11,
+        "encoding": "fisher",
+        "pca":True,
+        "num_workers": 16, # 8
+        "k_folds": 2,
+        "task_type": "mlp_svm", # mlp_svm, mlp_only
+        "model_type": "mlp",
+        "patches_lvl": patches_lvl,
+        "patches_method":"sum"
+    }
+    run_experiment(experiment_config=experiment_config)
