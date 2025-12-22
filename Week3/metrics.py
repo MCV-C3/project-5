@@ -127,13 +127,13 @@ class BaseMetricsComputer:
         self.metrics[f'{prefix}f1_macro'] = f1_score(self.y_true, self.y_pred, average="macro", zero_division=0)
         
         # Per-class Metrics (stored as dicts)
-        p_class = precision_score(self.y_true, self.y_pred, average=None, zero_division=0)
+        """p_class = precision_score(self.y_true, self.y_pred, average=None, zero_division=0)
         r_class = recall_score(self.y_true, self.y_pred, average=None, zero_division=0)
         f_class = f1_score(self.y_true, self.y_pred, average=None, zero_division=0)
         
         self.metrics[f'{prefix}precision_per_class'] = {str(c): p_class[i] for i, c in enumerate(self.classes)}
         self.metrics[f'{prefix}recall_per_class'] = {str(c): r_class[i] for i, c in enumerate(self.classes)}
-        self.metrics[f'{prefix}f1_per_class'] = {str(c): f_class[i] for i, c in enumerate(self.classes)}
+        self.metrics[f'{prefix}f1_per_class'] = {str(c): f_class[i] for i, c in enumerate(self.classes)}"""
         
         return self.metrics
 

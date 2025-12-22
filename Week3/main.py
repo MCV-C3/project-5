@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt
-from models import SimpleModel, WraperModel
+from models import WraperModel
 import torchvision.transforms.v2  as F
 from torchviz import make_dot
 import tqdm
@@ -93,7 +93,7 @@ def plot_metrics(train_metrics: Dict, test_metrics: Dict, metric_name: str):
         - loss.png for loss plots
         - metrics.png for other metrics plots
     """
-    plt.figure(figsize=(10, 6))
+    fig = plt.figure(figsize=(10, 6))
     plt.plot(train_metrics[metric_name], label=f'Train {metric_name.capitalize()}')
     plt.plot(test_metrics[metric_name], label=f'Test {metric_name.capitalize()}')
     plt.xlabel('Epoch')
@@ -102,12 +102,7 @@ def plot_metrics(train_metrics: Dict, test_metrics: Dict, metric_name: str):
     plt.legend()
     plt.grid(True)
 
-    # Save the plot with the appropriate name
-    filename = "loss.png" if metric_name.lower() == "loss" else "metrics.png"
-    plt.savefig(filename)
-    print(f"Plot saved as {filename}")
-
-    plt.close()  # Close the figure to free memory
+    return fig
 
 # Data augmentation example
 def get_data_transforms():

@@ -14,12 +14,11 @@ import wandb
 from models import WraperModel, EarlyStopping
 from main import train, test, plot_computational_graph, plot_metrics
 from metrics import TestMetrics
-from svm_utils import train_svm, train_svm_patches
 
 def run_experiment(wandb_config=None, experiment_config=None):
     # Default configurations
     default_wandb_config = {
-        "project": "C3-Week2-MLP",
+        "project": "C3-Week3-MobileNet",
         "entity": "project-5",
     }
     
@@ -35,16 +34,12 @@ def run_experiment(wandb_config=None, experiment_config=None):
         "save_weights": False
     }
     
-    # Merge with provided configs
-    if wandb_config is None:
-        wandb_config = default_wandb_config
-    else:
-        wandb_config = {**default_wandb_config, **wandb_config}
+    # Merge configs
+    if wandb_config is None: wandb_config = default_wandb_config
+    else: wandb_config = {**default_wandb_config, **wandb_config}
     
-    if experiment_config is None:
-        experiment_config = default_experiment_config
-    else:
-        experiment_config = {**default_experiment_config, **experiment_config}
+    if experiment_config is None: experiment_config = default_experiment_config
+    else: experiment_config = {**default_experiment_config, **experiment_config}
 
     # Init wandb
     wandb.init(
@@ -65,8 +60,8 @@ def run_experiment(wandb_config=None, experiment_config=None):
                                     F.Resize(size=cfg.image_size),
                                 ])
     
-    data_train = ImageFolder("~/data/Master/MIT_split/train", transform=transformation)
-    data_test = ImageFolder("~/data/Master/MIT_split/test", transform=transformation) 
+    data_train = ImageFolder("~/mcv/datasets/C3/2425/MIT_large_train/train", transform=transformation)
+    data_test = ImageFolder("~/mcv/datasets/C3/2425/MIT_large_train/test", transform=transformation) 
 
     train_loader = DataLoader(data_train, batch_size=cfg.batch_size, pin_memory=True, shuffle=True, num_workers=cfg.num_workers)
     test_loader = DataLoader(data_test, batch_size=cfg.batch_size, pin_memory=True, shuffle=False, num_workers=cfg.num_workers)
@@ -81,9 +76,6 @@ def run_experiment(wandb_config=None, experiment_config=None):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
     NUM_EPOCHS = cfg.num_epochs
-
-    train_losses, train_accuracies = [], []
-    test_losses, test_accuracies = [], []
     
     # For early stopping
     stopper = EarlyStopping(patience = cfg.patience, min_delta = cfg.min_delta)
@@ -91,18 +83,23 @@ def run_experiment(wandb_config=None, experiment_config=None):
     for epoch in tqdm.tqdm(range(NUM_EPOCHS), desc="TRAINING THE MODEL"):
         _, _, train_loss, train_accuracy = train(model, train_loader, criterion, optimizer, device)
         _, _, _, test_loss, test_accuracy = test(model, test_loader, criterion, device)
-
-        # History
-        train_losses.append(train_loss)
-        train_accuracies.append(train_accuracy)
-        test_losses.append(test_loss)
-        test_accuracies.append(test_accuracy)
+        
+        print(f"Epoch {epoch+1} | Train Loss: {train_loss:.4f} Acc: {train_accuracy:.4f} | "
+              f"Test Loss: {test_loss:.4f} Acc: {test_accuracy:.4f}")
         
         # Early stopping
         stopper(test_loss, model)
         if stopper.early_stop == True:
-            print(f"Stopping training in epoch {epoch}")
+            print(f"Stopping training in epoch {epoch+1}")
             break
+
+        # History
+        wandb.log({
+            "train_accuracies": train_accuracy,
+            "test_accuracies": test_accuracy,
+            "train_losses": train_loss,
+            "test_losses": test_loss,
+        })
         
     # Save model weights
     if cfg.save_weights:
