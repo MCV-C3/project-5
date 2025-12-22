@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import torchvision.transforms.v2  as F
 import tqdm
 import wandb
-from sklearn.model_selection import KFold, GroupKFold
+from sklearn.utils.class_weight import compute_class_weight
 import collections
 
 from models import WraperModel, EarlyStopping
@@ -105,6 +105,11 @@ def run_experiment(wandb_config=None, experiment_config=None):
         model = model.to(device)
         
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
+        
+        #class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(train_loader.dataset.targets), y=train_loader.dataset.targets)
+        #weights_tensor = torch.tensor(class_weights, dtype=torch.float).to(device)
+        #criterion = nn.CrossEntropyLoss(weight=weights_tensor)
+        
         criterion = nn.CrossEntropyLoss()
 
         # For early stopping
