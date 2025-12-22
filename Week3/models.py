@@ -1,6 +1,7 @@
 
 import torch.nn as nn
 import torch
+import copy
 from pytorch_grad_cam import GradCAM, HiResCAM, ScoreCAM, GradCAMPlusPlus, AblationCAM, XGradCAM, EigenCAM, FullGrad
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
@@ -18,44 +19,30 @@ import numpy as np
 
 import pdb
 
-
-class SimpleModel(nn.Module):
-
-    def __init__(self, input_d: int, hidden_d: int, output_d: int):
-
-        super(SimpleModel, self).__init__()
-
-        self.input_d = input_d
-        self.hidden_d = hidden_d
-        self.output_d = output_d
-
-
-        self.layer1 = nn.Linear(input_d, hidden_d)
-        self.layer2 = nn.Linear(hidden_d, hidden_d)
-        self.output_layer = nn.Linear(hidden_d, output_d)
-
-        self.activation = nn.ReLU()
-
-
-    def forward(self, x):
-        x = x.view(x.shape[0], -1)
-        x = self.layer1(x)
-        x = self.activation(x)
-        x = self.layer2(x)
-        x = self.activation(x)
-
-        x = self.output_layer(x)
+class EarlyStopping():
+    def __init__(self, patience=5, min_delta=0):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.best_loss = float('inf')
+        self.early_stop = False
+        self.counter = 0
+        self.best_model = None
         
-        return x
-    
-
+    def __call__(self, val_loss, model):
+        if val_loss < self.best_loss - self.min_delta:
+            self.best_loss = val_loss
+            self.counter = 0
+            self.best_model = copy.deepcopy(model.state_dict())
+        else:
+            self.counter += 1
+            if self.counter == 5:
+                self.early_stop = True
 
 class WraperModel(nn.Module):
     def __init__(self, num_classes: int, feature_extraction: bool=True):
         super(WraperModel, self).__init__()
 
-        # Load pretrained VGG16 model
-        #self.backbone = models.vgg16(weights='IMAGENET1K_V1')
+        # Load pretrained MobileNet model
         self.backbone = models.mobilenet_v3_large(weights='IMAGENET1K_V1')
         
         if feature_extraction:

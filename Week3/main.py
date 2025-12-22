@@ -19,6 +19,7 @@ def train(model, dataloader, criterion, optimizer, device):
     model.train()
     train_loss = 0.0
     correct, total = 0, 0
+    all_predicted, all_labels, all_probabilities = [], [], []
 
     for inputs, labels in dataloader:
         inputs, labels = inputs.to(device), labels.to(device)
@@ -37,16 +38,21 @@ def train(model, dataloader, criterion, optimizer, device):
         _, predicted = outputs.max(1)
         correct += (predicted == labels).sum().item()
         total += labels.size(0)
+        
+        # Track true labels, predicted labels and probabilities for each class
+        all_predicted.extend(predicted.cpu().numpy())
+        all_labels.extend(labels.cpu().numpy())
 
     avg_loss = train_loss / total
     accuracy = correct / total
-    return avg_loss, accuracy
+    return all_predicted, all_labels, avg_loss, accuracy
 
 
 def test(model, dataloader, criterion, device):
     model.eval()
     test_loss = 0.0
     correct, total = 0, 0
+    all_predicted, all_labels, all_probabilities = [], [], []
 
     with torch.no_grad():
         for inputs, labels in dataloader:
@@ -61,10 +67,18 @@ def test(model, dataloader, criterion, device):
             _, predicted = outputs.max(1)
             correct += (predicted == labels).sum().item()
             total += labels.size(0)
+            
+            # Get Soft Probabilities
+            probs = torch.softmax(outputs, dim=1)
+            
+            # Track true labels, predicted labels and probabilities for each class
+            all_predicted.extend(predicted.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            all_probabilities.extend(probs.cpu().numpy())
 
     avg_loss = test_loss / total
     accuracy = correct / total
-    return avg_loss, accuracy
+    return all_predicted, all_labels, all_probabilities, avg_loss, accuracy
 
 def plot_metrics(train_metrics: Dict, test_metrics: Dict, metric_name: str):
     """
