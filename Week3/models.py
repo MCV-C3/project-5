@@ -167,27 +167,26 @@ if __name__ == "__main__":
 
     # Load a pretrained model and modify it
     model = WraperModel(num_classes=8, feature_extraction=False)
-    model.load_state_dict(torch.load("./saved_models/test_0.001_20.pt"))
+    model.load_state_dict(torch.load("./saved_models/fold-1_0.001_20.pt"))
     #model = model
     
     """print(f"Total capas en features: {len(model.backbone.features)}")
-    # Esto te listará todas las capas con su índice real
     for i, layer in enumerate(model.backbone.features):
         print(f"Index {i}: {layer}")"""
 
     transformation  = F.Compose([
                                     F.ToImage(),
                                     F.ToDtype(torch.float32, scale=True),
-                                    F.Resize(size=(256, 256)),
+                                    F.Resize(size=(224, 224)),
                                 ])
     # Example GradCAM usage
-    path = os.path.expanduser("~/mcv/datasets/C3/2425/MIT_large_train/train/coast/arnat59.jpg")
+    path = os.path.expanduser("~/mcv/datasets/C3/2425/MIT_small_train_1/test/coast/arnat59.jpg")
     dummy_input = Image.open(path)
     input_image = transformation(dummy_input).unsqueeze(0)
 
-    target_layers = [model.backbone.features[16]]
+    target_layers = [model.backbone.features[16]] # Compute Grad Cam on last feature extraction layer
     #target_layers = [model.backbone.features[15].block[-1]]
-    targets = [ClassifierOutputTarget(0)]
+    targets = [ClassifierOutputTarget(0)] # Number of the class that is being looked
     
     image = torch.from_numpy(np.array(dummy_input)).cpu().numpy()
     image = (image - image.min()) / (image.max() - image.min()) ## Image needs to be between 0 and 1 and be a numpy array (Remember that if you have norlized the image you need to denormalize it before applying this (image * std + mean))
