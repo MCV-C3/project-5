@@ -7,84 +7,180 @@ import numpy as np
 import glob
 import tqdm
 import os
+import pickle
 
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_predict
 from sklearn.metrics import accuracy_score
+from sklearn.svm import SVC
+from sklearn.model_selection import StratifiedKFold
+
+SPLIT_PATH = "/home/bernat/MCV/C3/project/project-5/data/MIT_split/"
+SPLIT_PATH = "../data/MIT_split/"
 
 
+def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"], kpts: Literal["N", "T"]):
+    return np.array([bovw._compute_codebook_descriptor(kpts=kpt, descriptors=descriptor, kmeans=bovw.codebook_algo) for kpt,descriptor in zip(kpts,descriptors)])
 
+def get_descriptors_original(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], cache_file: str, split: str):
 
-def extract_bovw_histograms(bovw: Type[BOVW], descriptors: Literal["N", "T", "d"]):
-    return np.array([bovw._compute_codebook_descriptor(descriptors=descriptor, kmeans=bovw.codebook_algo) for descriptor in descriptors])
+    # Try loading from cache to avoid recomputation
+    if os.path.exists(cache_file):
+    #if False:    
+        print(f"Phase[{split}]: Loading descriptors from {cache_file}")
+        try:
+            with open(cache_file, 'rb') as f:
+                data = pickle.load(f)
+        except:
+            raise ValueError(f"Could not load cache file {cache_file}")
 
+        all_kpts = data['kpts']
+        all_descriptors = data['descriptors']
+        all_labels = data['labels']
+        #del data
+    else:
+        all_kpts = []
+        all_descriptors = []
+        all_labels = []
 
-def test(dataset: List[Tuple[Type[Image.Image], int]]
-         , bovw: Type[BOVW], 
-         classifier:Type[object]):
-    
-    test_descriptors = []
-    descriptors_labels = []
-    
-    for idx in tqdm.tqdm(range(len(dataset)), desc="Phase [Eval]: Extracting the descriptors"):
-        image, label = dataset[idx]
-        _, descriptors = bovw._extract_features(image=np.array(image))
+        for idx in tqdm.tqdm(range(len(dataset)), desc=f"Phase[{split}]: Extracting the descriptors"):
+
+            image, label = dataset[idx]
+            kpts, descriptors = bovw._extract_features(image=np.array(image))
+
+            if descriptors is not None:
+                all_kpts.append(kpts)
+                all_descriptors.append(descriptors)
+                all_labels.append(label)
         
-        if descriptors is not None:
-            test_descriptors.append(descriptors)
-            descriptors_labels.append(label)
-            
+        print(f"Saving features to {cache_file}")
+        os.makedirs("./cache_test", exist_ok=True)
+        os.makedirs("./cache_train", exist_ok=True)
+        with open(cache_file, 'wb') as f:
+            pickle.dump({
+                'kpts': all_kpts,
+                'descriptors': all_descriptors,
+                'labels': all_labels
+            }, f)
+        
+    return all_kpts, all_descriptors, all_labels
+
+
+def get_descriptors(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], cache_file: str, split: str):
+
+    # Try loading from cache to avoid recomputation
+    if os.path.exists(cache_file):
+    #if False:    
+        print(f"Phase[{split}]: Loading descriptors from {cache_file}")
+        try:
+            with open(cache_file, 'rb') as f:
+                data = pickle.load(f)
+        except:
+            raise ValueError(f"Could not load cache file {cache_file}")
+
+        all_kpts = data['kpts']
+        all_descriptors = data['descriptors']
+        all_labels = data['labels']
+        del data
+    else:
+        all_kpts = []
+        all_descriptors = []
+        all_labels = []
+
+        for idx in tqdm.tqdm(range(len(dataset)), desc=f"Phase[{split}]: Extracting the descriptors"):
+
+            image_path, label = dataset[idx]
+            with Image.open(image_path) as img_pil:
+                image_np = np.array(img_pil.convert("RGB"))
+                kpts, descriptors = bovw._extract_features(image=image_np)
+
+            if descriptors is not None:
+                all_kpts.append(kpts)
+                all_descriptors.append(descriptors)
+                all_labels.append(label)
+        
+        print(f"Saving features to {cache_file}")
+        os.makedirs("./cache_test", exist_ok=True)
+        os.makedirs("./cache_train", exist_ok=True)
+        with open(cache_file, 'wb') as f:
+            pickle.dump({
+                'kpts': all_kpts,
+                'descriptors': all_descriptors,
+                'labels': all_labels
+            }, f)
+        
+    return all_kpts, all_descriptors, all_labels
+
+
+def test(dataset: List[Tuple[Type[Image.Image], int]], bovw: Type[BOVW], 
+          classifier: Type[object], cache_file: str=None):
+    
+    test_kpts, test_descriptors, descriptors_labels = get_descriptors(dataset, bovw, cache_file, split="Test")
     
     print("Computing the bovw histograms")
-    bovw_histograms = extract_bovw_histograms(descriptors=test_descriptors, bovw=bovw)
-    
-    print("predicting the values")
-    y_pred = classifier.predict(bovw_histograms)
-    
-    print("Accuracy on Phase[Test]:", accuracy_score(y_true=descriptors_labels, y_pred=y_pred))
-    
+    bovw_histograms = extract_bovw_histograms(kpts=test_kpts, descriptors=test_descriptors, bovw=bovw)
 
-def train(dataset: List[Tuple[Type[Image.Image], int]],
-           bovw:Type[BOVW]):
-    all_descriptors = []
-    all_labels = []
+    print("Predicting the values")
+    y_probas = classifier.predict_proba(bovw_histograms)
+    y_pred = np.argmax(y_probas, axis=1)
+
+    #del bovw_histograms, classifier
+    return y_pred, y_probas, descriptors_labels 
+
+def train(dataset: List[Tuple[Type[Image.Image], int]], bovw:Type[BOVW], 
+          classifier: Type[object], k_folds: int=5, cache_file: str=None):
+
+    # Define a stratified splitter for dealing with the unbalanced classes
+    cv_splitter = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=42)
     
-    for idx in tqdm.tqdm(range(len(dataset)), desc="Phase [Training]: Extracting the descriptors"):
-        
-        image, label = dataset[idx]
-        _, descriptors = bovw._extract_features(image=np.array(image))
-        
-        if descriptors  is not None:
-            all_descriptors.append(descriptors)
-            all_labels.append(label)
-            
-    print("Fitting the codebook")
-    kmeans, cluster_centers = bovw._update_fit_codebook(descriptors=all_descriptors)
+    all_kpts, all_descriptors, all_labels = get_descriptors(dataset, bovw, cache_file, split="Train")
+
+    print("Fitting the codebook", end=" ")
+    dt = bovw._update_fit_codebook(descriptors=all_descriptors)
+    print(f"(took {dt} seconds)")
 
     print("Computing the bovw histograms")
-    bovw_histograms = extract_bovw_histograms(descriptors=all_descriptors, bovw=bovw) 
+    bovw_histograms = extract_bovw_histograms(kpts=all_kpts, descriptors=all_descriptors, bovw=bovw) 
     
-    print("Fitting the classifier")
-    classifier = LogisticRegression(class_weight="balanced").fit(bovw_histograms, all_labels)
-
-    print("Accuracy on Phase[Train]:", accuracy_score(y_true=all_labels, y_pred=classifier.predict(bovw_histograms)))
+    # Do a mapping so we can know to which fold corresponds each train sample
+    indices_per_fold = []
+    for fold_idx, (train_index, test_index) in enumerate(cv_splitter.split(bovw_histograms, all_labels)):
+        indices_per_fold.append(test_index)
     
-    return bovw, classifier
+    print("Fitting the classifier (cross-validation)")
+    
+    # Obtain the predictions and probabilities of the train set using cross-validation
+    y_probas = cross_val_predict(estimator=classifier,
+                                X=bovw_histograms, 
+                                y=all_labels, 
+                                cv=cv_splitter, 
+                                method='predict_proba',
+                                n_jobs=11
+                                )
+    y_pred = np.argmax(y_probas, axis=1)
+
+    classifier.fit(bovw_histograms, all_labels)    
+    #y_pred = classifier.predict(bovw_histograms)
+    #y_probas = classifier.predict_proba(bovw_histograms)
+    print("Classifier fitted.")
+    #del all_kpts, all_descriptors, bovw_histograms, classifier
+    return y_pred, y_probas, all_labels, indices_per_fold
 
 
-def Dataset(ImageFolder:str = "data/MIT_split/train") -> List[Tuple[Type[Image.Image], int]]:
+def Dataset_original(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[Type[Image.Image], int]]:
 
     """
     Expected Structure:
 
-        ImageFolder/<cls label>/xxx1.png
-        ImageFolder/<cls label>/xxx2.png
-        ImageFolder/<cls label>/xxx3.png
+        ImageFolder/<cls label>/xxx1.jpg
+        ImageFolder/<cls label>/xxx2.jpg
+        ImageFolder/<cls label>/xxx3.jpg
         ...
 
         Example:
-            ImageFolder/cat/123.png
-            ImageFolder/cat/nsdf3.png
-            ImageFolder/cat/[...]/asd932_.png
+            ImageFolder/cat/123.jpg
+            ImageFolder/cat/nsdf3.jpg
+            ImageFolder/cat/[...]/asd932_.jpg
     
     """
 
@@ -104,17 +200,43 @@ def Dataset(ImageFolder:str = "data/MIT_split/train") -> List[Tuple[Type[Image.I
 
     return dataset
 
+def Dataset(ImageFolder:str = SPLIT_PATH + "train") -> List[Tuple[str, int]]: # Changed Type Hint
+    """
+    Returns a list of (image_path, label) tuples instead of (image_object, label).
+    """
+    map_classes = {clsi: idx for idx, clsi  in enumerate(os.listdir(ImageFolder))}
+    dataset :List[Tuple] = []
 
-    
+    for idx, cls_folder in enumerate(os.listdir(ImageFolder)):
+        image_path = os.path.join(ImageFolder, cls_folder)
+        images: List[str] = glob.glob(image_path+"/*.jpg")
+        for img in images:
+            dataset.append((img, map_classes[cls_folder])) 
+
+    return dataset
+
+def TrainDataset() -> List[Tuple[Type[Image.Image], int]]:
+    """Wrapper for training dataset"""
+    return Dataset(ImageFolder=SPLIT_PATH+"train")
+
+def TestDataset() -> List[Tuple[Type[Image.Image], int]]:
+    """Wrapper for testing dataset"""
+    return Dataset(ImageFolder=SPLIT_PATH+"test")
 
 
 if __name__ == "__main__":
-     #/home/cboned/data/Master/MIT_split
-    data_train = Dataset(ImageFolder="/home/cboned/data/Master/MIT_split/train")
-    data_test = Dataset(ImageFolder="/home/cboned/data/Master/MIT_split/test") 
+    data_train = TrainDataset()
+    data_test = TestDataset()
 
     bovw = BOVW()
+    classifier = LogisticRegression(class_weight="balanced")
     
-    bovw, classifier = train(dataset=data_train, bovw=bovw)
+    y_pred_train, _, all_labels = train(dataset=data_train, bovw=bovw, classifier=classifier, cache_file="D-SIFT_train_cache.pkl")
     
-    test(dataset=data_test, bovw=bovw, classifier=classifier)
+    acc_train = accuracy_score(y_true=all_labels, y_pred=y_pred_train)
+    print(f"Accuracy on Phase[Train]: {acc_train:.4f}")
+
+    y_pred_test, y_probas, descriptors_labels = test(dataset=data_test, bovw=bovw, classifier=classifier, cache_file="D-SIFT_test_cache.pkl")
+
+    acc_test = accuracy_score(y_true=descriptors_labels, y_pred=y_pred_test)
+    print(f"Accuracy on Phase[Test]: {acc_test:.4f}")
