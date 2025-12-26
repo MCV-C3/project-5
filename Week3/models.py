@@ -17,6 +17,7 @@ from PIL import Image
 import torchvision.transforms.v2  as F
 import numpy as np 
 
+import os
 import pdb
 
 class EarlyStopping():
@@ -55,27 +56,32 @@ class WraperModel(nn.Module):
         return self.backbone(x)
     
 
-    def extract_feature_maps(self, input_image:torch.Tensor):
+    def extract_feature_maps_by_block(self, input_image: torch.Tensor):
+        """
+        Extracts output from the first 16 main blocks of the backbone.
+        """
+        feature_maps = []
+        layer_names = []
+        hooks = []
 
-        conv_weights =[]
-        conv_layers = []
-        total_conv_layers = 0
+        def hook_fn(name):
+            def rel_hook(module, input, output):
+                # output.detach() is critical to avoid memory leaks
+                feature_maps.append(output.detach())
+                layer_names.append(name)
+            return rel_hook
 
-        for module in self.backbone.features.children():
-            if isinstance(module, nn.Conv2d):
-                total_conv_layers += 1
-                conv_weights.append(module.weight)
-                conv_layers.append(module)
+        # Target direct children (Block 0 to 15)
+        for i, (name, module) in enumerate(self.backbone.features.named_children()):
+            if i < 16:
+                hooks.append(module.register_forward_hook(hook_fn(f"Block_{i}")))
 
+        with torch.no_grad():
+            self.backbone(input_image)
 
-        print("TOTAL CONV LAYERS: ", total_conv_layers)
-        feature_maps = []  # List to store feature maps
-        layer_names = []  # List to store layer names
-        x= torch.clone(input=input_image)
-        for layer in conv_layers:
-            x = layer(x)
-            feature_maps.append(x)
-            layer_names.append(str(layer))
+        # Always remove hooks to keep the model clean
+        for hook in hooks:
+            hook.remove()
 
         return feature_maps, layer_names
 
@@ -161,24 +167,13 @@ if __name__ == "__main__":
 
     # Load a pretrained model and modify it
     model = WraperModel(num_classes=8, feature_extraction=False)
-    #model.load_state_dict(torch.load("saved_model.pt"))
+    model.load_state_dict(torch.load("./saved_models/test_0.001_20.pt"))
     #model = model
-
-    """
-        features.0
-        features.2
-        features.5
-        features.7
-        features.10
-        features.12
-        features.14
-        features.17
-        features.19
-        features.21
-        features.24
-        features.26
-        features.28
-    """
+    
+    """print(f"Total capas en features: {len(model.backbone.features)}")
+    # Esto te listará todas las capas con su índice real
+    for i, layer in enumerate(model.backbone.features):
+        print(f"Index {i}: {layer}")"""
 
     transformation  = F.Compose([
                                     F.ToImage(),
@@ -186,13 +181,13 @@ if __name__ == "__main__":
                                     F.Resize(size=(256, 256)),
                                 ])
     # Example GradCAM usage
-    dummy_input = Image.open("/home/cboned/data/Master/MIT_split/test/highway/art803.jpg")#torch.randn(1, 3, 224, 224)
+    path = os.path.expanduser("~/mcv/datasets/C3/2425/MIT_large_train/train/coast/arnat59.jpg")
+    dummy_input = Image.open(path)
     input_image = transformation(dummy_input).unsqueeze(0)
 
-
-
-    target_layers = [model.backbone.features[26]]
-    targets = [ClassifierOutputTarget(6)]
+    target_layers = [model.backbone.features[16]]
+    #target_layers = [model.backbone.features[15].block[-1]]
+    targets = [ClassifierOutputTarget(0)]
     
     image = torch.from_numpy(np.array(dummy_input)).cpu().numpy()
     image = (image - image.min()) / (image.max() - image.min()) ## Image needs to be between 0 and 1 and be a numpy array (Remember that if you have norlized the image you need to denormalize it before applying this (image * std + mean))
@@ -207,35 +202,40 @@ if __name__ == "__main__":
     # Plot the result
     plt.imshow(visualization)
     plt.axis("off")
-    plt.show()
+    plt.savefig("./figures/grad_cam.png")
+    plt.close("all")
 
-    # Display processed feature maps shapes
-    feature_maps, layer_names = model.extract_feature_maps(input_image)
+    # 1. Run extraction
+    f_maps, l_names = model.extract_feature_maps_by_block(input_image)
 
-                                                                 ### Aggregate the feature maps
-    # Process and visualize feature maps
-    processed_feature_maps = []  # List to store processed feature maps
-    for feature_map in feature_maps:
-        feature_map = feature_map.squeeze(0)  # Remove the batch dimension
-        min_feature_map, min_index = torch.min(feature_map, 0) # Get the min across channels
-        processed_feature_maps.append(min_feature_map.data.cpu().numpy())
-    
-    
-    # Plot All the convolution feature maps separately
-    fig = plt.figure(figsize=(30, 50))
-    for i in range(len(processed_feature_maps)):
-        ax = fig.add_subplot(5, 4, i + 1)
-        ax.imshow(processed_feature_maps[i], cmap="hot", interpolation="nearest")
-        ax.axis("off")
-        ax.set_title(f"{layer_names[i].split('(')[0]}_{i}", fontsize=10)
+    # 2. Setup 4x4 Grid
+    fig, axes = plt.subplots(4, 4, figsize=(20, 20))
+    axes = axes.flatten()
 
+    for i in range(16):
+        # Process: Squeeze batch -> Mean across channels -> CPU
+        # Mean helps visualize the general activation area
+        f_map = torch.mean(f_maps[i].squeeze(0), dim=0).cpu()
+        
+        # Min-Max Normalization: Forces contrast to avoid flat colors
+        f_min, f_max = f_map.min(), f_map.max()
+        if f_max > f_min:
+            f_map = (f_map - f_min) / (f_max - f_min)
+        else:
+            f_map = torch.zeros_like(f_map)
+        
+        axes[i].imshow(f_map.numpy(), cmap='viridis')
+        axes[i].set_title(f"{l_names[i]} (Res: {f_map.shape[0]}x{f_map.shape[1]})", fontsize=10)
+        axes[i].axis('off')
 
-    plt.show()
+    plt.tight_layout()
+    plt.savefig("./figures/feature_maps.png", dpi=150)
+    plt.close(fig)
 
     ## Plot a concret layer feature map when processing a image thorugh the model
     ## Is not necessary to have gradients
 
-    with torch.no_grad():
+    """with torch.no_grad():
         feature_map = (model.extract_features_from_hooks(x=input_image, layers=["features.28"]))["features.28"]
         feature_map = feature_map.squeeze(0)  # Remove the batch dimension
         print(feature_map.shape)
@@ -244,10 +244,10 @@ if __name__ == "__main__":
     # Plot the result
     plt.imshow(processed_feature_map, cmap="gray")
     plt.axis("off")
-    plt.show()
+    plt.show()"""
 
 
 
     ## Draw the model
-    model_graph = draw_graph(model, input_size=(1, 3, 224, 224), device='meta', expand_nested=True, roll=True)
-    model_graph.visual_graph.render(filename="test", format="png", directory="./Week3")
+    #model_graph = draw_graph(model, input_size=(1, 3, 224, 224), device='meta', expand_nested=True, roll=True)
+    #model_graph.visual_graph.render(filename="test", format="png", directory="./Week3")

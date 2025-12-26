@@ -37,7 +37,7 @@ baseline_experiment = {
             'values':[0]
         },
         'save_weights':{
-            'values':[True]
+            'values':[False]
         },
         'k_folds':{
             'values': [4]
