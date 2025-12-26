@@ -1,6 +1,6 @@
 import wandb
-from run_experiment.run_experiment_cross_val import run_experiment
-#from run_experiment.run_experiment_test import run_experiment
+#from run_experiment.run_experiment_cross_val import run_experiment
+from run_experiment.run_experiment_test import run_experiment
 
 # Wandb configuration
 wandb_config = {

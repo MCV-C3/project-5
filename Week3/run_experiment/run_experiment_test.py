@@ -27,7 +27,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
         "batch_size": 256,
         "num_epochs": 20,
         "learning_rate": 0.001,
-        "output_dim": 11,
+        "output_dim": 8,
         "num_workers": 8,
         "patience": 5,
         "min_delta": 0,
@@ -58,6 +58,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
                                     F.ToImage(),
                                     F.ToDtype(torch.float32, scale=True),
                                     F.Resize(size=cfg.image_size),
+                                    #F.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
                                 ])
     
     data_train = ImageFolder("~/mcv/datasets/C3/2425/MIT_large_train/train", transform=transformation)

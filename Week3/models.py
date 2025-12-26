@@ -126,7 +126,7 @@ class WraperModel(nn.Module):
         Args:
             modify_fn (Callable[[nn.Module], nn.Module]): Function to modify a layer.
         """
-        self.vgg16 = modify_fn(self.vgg16)
+        self.mobileNet = modify_fn(self.mobileNet)
 
 
     def set_parameter_requires_grad(self, feature_extracting):
@@ -183,7 +183,6 @@ if __name__ == "__main__":
     transformation  = F.Compose([
                                     F.ToImage(),
                                     F.ToDtype(torch.float32, scale=True),
-                                    F.RandomHorizontalFlip(p=1.),
                                     F.Resize(size=(256, 256)),
                                 ])
     # Example GradCAM usage
