@@ -163,12 +163,25 @@ class WraperModel(nn.Module):
 
 # Example of usage
 if __name__ == "__main__":
+    IMG_SIZE=(224, 224)
+    
     torch.manual_seed(42)
 
     # Load a pretrained model and modify it
     model = WraperModel(num_classes=8, feature_extraction=False)
     model.load_state_dict(torch.load("./saved_models/fold-1_0.001_20.pt"))
-    #model = model
+    model.eval()
+    
+    idx_to_label = {
+        0: "Opencountry",
+        1: "coast",
+        2: "forest",
+        3: "highway",
+        4: "inside_city",
+        5: "mountain",
+        6: "street",
+        7: "tallbuilding"
+    }
     
     """print(f"Total capas en features: {len(model.backbone.features)}")
     for i, layer in enumerate(model.backbone.features):
@@ -177,10 +190,10 @@ if __name__ == "__main__":
     transformation  = F.Compose([
                                     F.ToImage(),
                                     F.ToDtype(torch.float32, scale=True),
-                                    F.Resize(size=(224, 224)),
+                                    F.Resize(size=IMG_SIZE),
                                 ])
     # Example GradCAM usage
-    path = os.path.expanduser("~/mcv/datasets/C3/2425/MIT_small_train_1/test/coast/arnat59.jpg")
+    path = os.path.expanduser("~/mcv/datasets/C3/2425/MIT_small_train_1/test/street/bost46.jpg")
     dummy_input = Image.open(path)
     input_image = transformation(dummy_input).unsqueeze(0)
 
@@ -188,15 +201,18 @@ if __name__ == "__main__":
     #target_layers = [model.backbone.features[15].block[-1]]
     targets = [ClassifierOutputTarget(0)] # Number of the class that is being looked
     
-    image = torch.from_numpy(np.array(dummy_input)).cpu().numpy()
-    image = (image - image.min()) / (image.max() - image.min()) ## Image needs to be between 0 and 1 and be a numpy array (Remember that if you have norlized the image you need to denormalize it before applying this (image * std + mean))
-
-    ## VIsualize the activation map from Grad Cam
-    ## To visualize this, it is mandatory to have gradients.
+    with torch.no_grad():
+        output = model(input_image)
+        _, predicted = output.max(1)
+    print(f"Output for input image: {output}")
+    print(f"Prediction for input image: {idx_to_label.get(predicted.item())}")
     
-    grad_cams = model.extract_grad_cam(input_image=input_image, target_layer=target_layers, targets=targets)
+    img_for_vis = np.array(dummy_input.resize(IMG_SIZE)).astype(np.float32) / 255.0
 
-    visualization = show_cam_on_image(image, grad_cams, use_rgb=True)
+    ## Visualize the activation map from Grad Cam
+    ## To visualize this, it is mandatory to have gradients.
+    grad_cams = model.extract_grad_cam(input_image=input_image, target_layer=target_layers, targets=targets)
+    visualization = show_cam_on_image(img_for_vis, grad_cams, use_rgb=True)
 
     # Plot the result
     plt.imshow(visualization)
@@ -224,7 +240,7 @@ if __name__ == "__main__":
             f_map = torch.zeros_like(f_map)
         
         axes[i].imshow(f_map.numpy(), cmap='viridis')
-        axes[i].set_title(f"{l_names[i]} (Res: {f_map.shape[0]}x{f_map.shape[1]})", fontsize=10)
+        axes[i].set_title(f"{l_names[i]} (Res: {f_map.shape[0]}x{f_map.shape[1]})", fontsize=16)
         axes[i].axis('off')
 
     plt.tight_layout()
