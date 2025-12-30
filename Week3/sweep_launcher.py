@@ -5,7 +5,7 @@ from run_experiment.run_experiment_cross_val import run_experiment
 # Wandb configuration
 wandb_config = {
     "project": "C3-Week3-MobileNet",
-    "entity": "project-5",
+    "entity": "marc-org",
 }
 
 # Layout for perfoming the sweeps for the different experiments

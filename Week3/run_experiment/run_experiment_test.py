@@ -19,7 +19,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
     # Default configurations
     default_wandb_config = {
         "project": "C3-Week3-MobileNet",
-        "entity": "project-5",
+        "entity": "marc-org",
     }
     
     default_experiment_config = {
@@ -66,6 +66,9 @@ def run_experiment(wandb_config=None, experiment_config=None):
 
     train_loader = DataLoader(data_train, batch_size=cfg.batch_size, pin_memory=True, shuffle=True, num_workers=cfg.num_workers)
     test_loader = DataLoader(data_test, batch_size=cfg.batch_size, pin_memory=True, shuffle=False, num_workers=cfg.num_workers)
+
+    print(f'Train lenght: {len(train_loader.dataset)} and test length: {len(test_loader.dataset)}')
+
 
     C, H, W = np.array(data_train[0][0]).shape
 

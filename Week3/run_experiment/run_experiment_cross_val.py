@@ -38,7 +38,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
     # Default configurations
     default_wandb_config = {
         "project": "C3-Week3-MobileNet",
-        "entity": "project-5",
+        "entity": "marc-org",
     }
     
     default_experiment_config = {
