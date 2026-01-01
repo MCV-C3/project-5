@@ -40,7 +40,7 @@ class EarlyStopping():
                 self.early_stop = True
 
 class WraperModel(nn.Module):
-    def __init__(self, num_classes: int, feature_extraction: bool=True, blocks_to_keep: Optional[List[int]] = None, out_feat: int = -1):
+    def __init__(self, num_classes: int, feature_extraction: bool=True, blocks_to_keep: Optional[List[int]] = None, out_feat: int = -1, dropout_prob: float = 0.2):
         super(WraperModel, self).__init__()
 
         # Load pretrained MobileNet model
@@ -63,14 +63,16 @@ class WraperModel(nn.Module):
                 else: out_features = out_feat
             
             # Modify the classifier head
-            self.backbone.classifier[0] = nn.Linear(new_in_channels, out_features)
-            """if feature_extraction:
-                for param in self.backbone.classifier[0].parameters():
-                    param.requires_grad = False"""
-            self.backbone.classifier[-1] = nn.Linear(out_features, num_classes)    
+            self.backbone.classifier = nn.Sequential(
+                nn.Linear(new_in_channels, out_features),
+                nn.Hardswish(),
+                nn.Dropout(p=dropout_prob, inplace=True),
+                nn.Linear(out_features, num_classes)
+            )
             
         else:
             # Modify the classifier for the number of classes
+            self.backbone.classifier[2] = nn.Dropout(p=dropout_prob, inplace=True)
             self.backbone.classifier[-1] = nn.Linear(self.backbone.classifier[-1].in_features, num_classes)
 
     def forward(self, x):

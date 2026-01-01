@@ -20,6 +20,32 @@ import os
 
 BASE_PATH = "~/mcv/datasets/C3/2425/"
 
+def get_optimizer (model, cfg):
+    params = model.parameters()
+    lr = cfg.learning_rate
+    wd = cfg.weight_decay # Regularizer (L2 penalty)
+    mom = cfg.momentum
+
+    opt_name = cfg.optimizer.lower()
+
+    if opt_name == 'sgd':
+        return optim.SGD(params, lr=lr, momentum=mom, weight_decay=wd)
+    elif opt_name == 'rmsprop':
+        return optim.RMSprop(params, lr=lr, momentum=mom, weight_decay=wd)
+    elif opt_name == 'adagrad':
+        return optim.Adagrad(params, lr=lr, weight_decay=wd)
+    elif opt_name == 'adadelta':
+        return optim.Adadelta(params, lr=lr, weight_decay=wd)
+    elif opt_name == 'adam':
+        return optim.Adam(params, lr=lr, weight_decay=wd)
+    elif opt_name == 'adamax':
+        return optim.Adamax(params, lr=lr, weight_decay=wd)
+    elif opt_name == 'nadam':
+        return optim.NAdam(params, lr=lr, weight_decay=wd)
+    else:
+        print(f"Optimizer {opt_name} not found. Defaulting to Adam.")
+        return optim.Adam(params, lr=lr, weight_decay=wd)
+
 def get_loaders_for_fold(fold_idx, batch_size=32, transform_train=None, transform_test=None, num_workers=8):
     fold_dir = f"MIT_small_train_{fold_idx}"
     
@@ -122,7 +148,11 @@ def run_experiment(wandb_config=None, experiment_config=None):
         "aug_zoom": 0.0,
         "aug_gaussian_blur": 0.0,
         "use_imagenet_norm": False,
-        "add_aug": False
+        "add_aug": False,
+        "optimizer": "Adam",
+        "momentum": 0.9,
+        "weight_decay": 0.0,
+        "dropout_prob": 0.2, # Topology default 
     }
     
     # Merge configs
@@ -224,10 +254,14 @@ def run_experiment(wandb_config=None, experiment_config=None):
         #                                                 transform_train=transform_train,
         #                                                 num_workers=cfg.num_workers)
 
-        model = WraperModel(num_classes=cfg.output_dim, feature_extraction=cfg.feature_extraction, blocks_to_keep=cfg.blocks_to_keep, out_feat=cfg.out_feat)
+        model = WraperModel(num_classes=cfg.output_dim,
+                            feature_extraction=cfg.feature_extraction,
+                            blocks_to_keep=cfg.blocks_to_keep,
+                            out_feat=cfg.out_feat,
+                            dropout_prob=cfg.dropout_prob)
         model = model.to(device)
         
-        optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
+        optimizer = get_optimizer(model=model, cfg=cfg)
         
         #class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(train_loader.dataset.targets), y=train_loader.dataset.targets)
         #weights_tensor = torch.tensor(class_weights, dtype=torch.float).to(device)
