@@ -224,7 +224,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
         #                                                 transform_train=transform_train,
         #                                                 num_workers=cfg.num_workers)
 
-        model = WraperModel(num_classes=cfg.output_dim, feature_extraction=True)
+        model = WraperModel(num_classes=cfg.output_dim, feature_extraction=cfg.feature_extraction, blocks_to_keep=cfg.blocks_to_keep, out_feat=cfg.out_feat)
         model = model.to(device)
         
         optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)

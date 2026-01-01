@@ -36,11 +36,11 @@ class EarlyStopping():
             self.best_model = copy.deepcopy(model.state_dict())
         else:
             self.counter += 1
-            if self.counter == 5:
+            if self.counter == self.patience:
                 self.early_stop = True
 
 class WraperModel(nn.Module):
-    def __init__(self, num_classes: int, feature_extraction: bool=True):
+    def __init__(self, num_classes: int, feature_extraction: bool=True, blocks_to_keep: Optional[List[int]] = None, out_feat: int = -1):
         super(WraperModel, self).__init__()
 
         # Load pretrained MobileNet model
@@ -48,9 +48,30 @@ class WraperModel(nn.Module):
         
         if feature_extraction:
             self.set_parameter_requires_grad(feature_extracting=feature_extraction)
-
-        # Modify the classifier for the number of classes
-        self.backbone.classifier[-1] = nn.Linear(self.backbone.classifier[-1].in_features, num_classes)
+        
+        # Modify the internal features blocks keeping "blocks_to_kep"
+        if blocks_to_keep is not None:
+            # We extract the original blocks and reconstruct the features
+            all_blocks = list(self.backbone.features.children())
+            self.backbone.features = nn.Sequential(*[all_blocks[i] for i in blocks_to_keep])
+            
+            # Recalculate the classifier input because removing blocks changes the depth
+            with torch.no_grad():
+                dummy_input = torch.randn(1, 3, 224, 224)
+                new_in_channels = self.backbone.features(dummy_input).shape[1]
+                if out_feat == -1: out_features = self.backbone.classifier[0].out_features
+                else: out_features = out_feat
+            
+            # Modify the classifier head
+            self.backbone.classifier[0] = nn.Linear(new_in_channels, out_features)
+            """if feature_extraction:
+                for param in self.backbone.classifier[0].parameters():
+                    param.requires_grad = False"""
+            self.backbone.classifier[-1] = nn.Linear(out_features, num_classes)    
+            
+        else:
+            # Modify the classifier for the number of classes
+            self.backbone.classifier[-1] = nn.Linear(self.backbone.classifier[-1].in_features, num_classes)
 
     def forward(self, x):
         return self.backbone(x)

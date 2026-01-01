@@ -315,7 +315,8 @@ class FoldMetrics:
             loss_data_plot, 
             title="Loss Evolution", 
             x_label="Epoch", 
-            y_label="Loss"
+            y_label="Loss",
+            dim = [0, 2.25]
         )
         
         return fig_acc, fig_loss
