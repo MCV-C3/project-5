@@ -87,6 +87,9 @@ def get_augmented_loaders(fold_idx, cfg, aug_options, transform_base, norm_trans
         shuffle=True, 
         num_workers=cfg.num_workers
     )
+    
+    total_imagenes = len(train_loader.dataset)
+    print(f"Número total de imágenes: {total_imagenes}")
 
     val_loader = DataLoader(
         val_ds, 

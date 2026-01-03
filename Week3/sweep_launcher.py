@@ -83,7 +83,7 @@ blocks_experiment = {
             'values':[5]
         },
         'min_delta':{
-            'values':[0.001]
+            'values':[0]
         },
         'save_weights':{
             'values':[False]
@@ -91,8 +91,26 @@ blocks_experiment = {
         'k_folds':{
             'values': [4]
         },
+        'aug_horizontal_flip':{
+            'values':[True]
+        },
+        'aug_rotation':{
+            'values':[True]
+        },
+        'aug_color_jitter':{
+            'values':[True]
+        },
+        'aug_zoom':{
+            'values':[True]
+        },
+        'aug_gaussian_blur':{
+            'values':[True]
+        },
+        'use_imagenet_norm':{
+            'values':[False]
+        },
         'add_aug':{
-            'values': [True]
+            'values':[True]
         }
     },
     'metric': {
@@ -123,7 +141,7 @@ train_all_experiment = {
             'values': [False]
         },
         'blocks_to_keep':{
-            'values': [list(range(15))]
+            'values': [list(range(14))]
         },
         'out_feat':{
             'values': [-1]
@@ -143,8 +161,26 @@ train_all_experiment = {
         'k_folds':{
             'values': [4]
         },
+        'aug_horizontal_flip':{
+            'values':[True]
+        },
+        'aug_rotation':{
+            'values':[True]
+        },
+        'aug_color_jitter':{
+            'values':[True]
+        },
+        'aug_zoom':{
+            'values':[True]
+        },
+        'aug_gaussian_blur':{
+            'values':[True]
+        },
+        'use_imagenet_norm':{
+            'values':[False]
+        },
         'add_aug':{
-            'values': [True]
+            'values':[True]
         }
     },
     'metric': {
