@@ -3,7 +3,7 @@ from run_experiment.run_experiment_cross_val import run_experiment
 #from run_experiment.run_experiment_test import run_experiment
 
 DO_HYPERPARAM_SEARCH = True
-NUM_RUNS = 2
+NUM_RUNS = 50
 
 # Wandb configuration
 wandb_config = {
@@ -192,15 +192,15 @@ train_all_experiment = {
     }
 }
 
-hyperparam_search = {
-    'method': 'bayes', 
+hyperparam_search_random = {
+    'method': 'random', 
     'metric': {
         'name': 'fold_accuracy_mean',
         'goal': 'maximize'
     },
     'parameters': {
         'blocks_to_keep': {
-            'value': list(range(15)) # Blocks 0 to 14
+            'value': list(range(14)) # Blocks 0 to 13
         },
         'out_feat': {
             'value': -1
@@ -219,7 +219,7 @@ hyperparam_search = {
         
         # 1. Training Dynamics
         'batch_size': {
-            'values': [16, 32, 64, 128, 256, 512]
+            'values': [32, 64, 128, 256, 512]
         },
         'num_epochs': {
             'values': [10, 50, 100]
@@ -238,14 +238,34 @@ hyperparam_search = {
 
         # 3. Regularization & Topology
         'dropout_prob': { # Drop-out layers params
-            'values': [0.0, 0.2, 0.4, 0.5, 0.6, 0.8] 
+            'values': [0.0, 0.2,0.5] 
         },
         'weight_decay': { # Regularizers (L2 penalty)
-            'values': [0.0, 0.0001, 0.001, 0.01] 
+            'values': [0.0, 0.000001, 0.00001, 0.0001, 0.001] 
         },
 
         # 4. Data Augmentation
-        'add_aug': {'value': True}, 
+        'aug_horizontal_flip':{
+            'values':[True]
+        },
+        'aug_rotation':{
+            'values':[True]
+        },
+        'aug_color_jitter':{
+            'values':[True]
+        },
+        'aug_zoom':{
+            'values':[True]
+        },
+        'aug_gaussian_blur':{
+            'values':[True]
+        },
+        'use_imagenet_norm':{
+            'values':[False]
+        },
+        'add_aug':{
+            'values':[True]
+        },
 
         # Other fixed parameters
         'num_workers': {'value': 8},
@@ -256,12 +276,103 @@ hyperparam_search = {
     }
 }
 
+hyperparam_search_bayes = {
+    'method': 'bayes', 
+    'metric': {
+        'name': 'fold_accuracy_mean',
+        'goal': 'maximize'
+    },
+    'parameters': {
+        'blocks_to_keep': {
+            'value': list(range(14)) # Blocks 0 to 13
+        },
+        'out_feat': {
+            'value': -1
+        },
+        'feature_extraction': {
+            'value': True
+        },
+        'image_size': {
+            'value': (224, 224)
+        },
+        'k_folds': {
+            'value': 4
+        },
+
+        # --- HYPERPARAMETERS TO SEARCH ---
+        
+        # 1. Training Dynamics
+        'batch_size': {
+            'values': [64, 128]
+        },
+        'num_epochs': {
+            'values': [10, 30, 50]
+        },
+        'learning_rate': {
+            'distribution': 'log_uniform_values',
+            'min': 0.00005,
+            'max': 0.005
+        },
+        
+        # 2. Optimizer & Momentum
+        'optimizer': {
+            'values': ['Adagrad', 'Adamax', 'RMSprop',  'Nadam']
+        },
+        'momentum': {
+            'min': 0.0,
+            'max': 0.9
+        },
+
+        # 3. Regularization & Topology
+        'dropout_prob': { # Drop-out layers params
+            'min': 0.0,
+            'max': 0.3
+        },
+        'weight_decay': { # Regularizers (L2 penalty)
+            'distribution': 'log_uniform_values',
+            'min': 1e-6,
+            'max': 1e-3
+        },
+
+        # 4. Data Augmentation
+        'aug_horizontal_flip':{
+            'values':[True]
+        },
+        'aug_rotation':{
+            'values':[True]
+        },
+        'aug_color_jitter':{
+            'values':[True]
+        },
+        'aug_zoom':{
+            'values':[True]
+        },
+        'aug_gaussian_blur':{
+            'values':[True]
+        },
+        'use_imagenet_norm':{
+            'values':[False]
+        },
+        'add_aug':{
+            'values':[True]
+        },
+
+        # Other fixed parameters
+        'num_workers': {'value': 8},
+        'patience': {'value': 5},
+        'min_delta': {'value': 0.001},
+        'output_dim': {'value': 8},
+        'save_weights': {'value': False}
+    }
+}
+
+
 def run_experiment_with_wandb_config():
     """Wrapper function to pass wandb_config to run_experiment."""
     run_experiment(wandb_config=wandb_config)
 
 if __name__ == "__main__":
-    sweep_id = wandb.sweep(hyperparam_search, project=wandb_config["project"], entity=wandb_config["entity"])
+    sweep_id = wandb.sweep(hyperparam_search_bayes, project=wandb_config["project"], entity=wandb_config["entity"])
     print(f"Initiated sweep with ID: {sweep_id}")
 
     if DO_HYPERPARAM_SEARCH:
