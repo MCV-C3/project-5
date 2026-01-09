@@ -223,9 +223,12 @@ def run_experiment(wandb_config=None, experiment_config=None):
     # data_train = ImageFolder("~/mcv/datasets/C3/2425/MIT_large_train/train", transform=transformation)
     # data_test = ImageFolder("~/mcv/datasets/C3/2425/MIT_large_train/test", transform=transformation) 
     
+    # Get dataset name from config or use default
+    dataset_name = getattr(cfg, 'dataset_name', 'MIT_large_train')
+    
     data_train, data_test = get_augmented_datasets(
-        train_path="~/mcv/datasets/C3/2425/MIT_large_train/train",
-        test_path="~/mcv/datasets/C3/2425/MIT_large_train/test",
+        train_path=f"~/mcv/datasets/C3/2425/{dataset_name}/train",
+        test_path=f"~/mcv/datasets/C3/2425/{dataset_name}/test",
         cfg=cfg,
         image_size=image_size
     )
@@ -239,10 +242,37 @@ def run_experiment(wandb_config=None, experiment_config=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Define the model to be used
-    model = WraperModel(num_classes=cfg.output_dim, feature_extraction=True)
+    feature_extraction = getattr(cfg, 'feature_extraction', True)
+    blocks_to_keep = getattr(cfg, 'blocks_to_keep', None)
+    out_feat = getattr(cfg, 'out_feat', -1)
+    dropout_prob = getattr(cfg, 'dropout_prob', 0.0)
+    
+    model = WraperModel(
+        num_classes=cfg.output_dim, 
+        feature_extraction=feature_extraction,
+        blocks_to_keep=blocks_to_keep,
+        out_feat=out_feat,
+        dropout_prob=dropout_prob
+    )
     model = model.to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate)
+    
+    # Get optimizer configuration
+    optimizer_name = getattr(cfg, 'optimizer', 'Adam')
+    weight_decay = getattr(cfg, 'weight_decay', 0.0)
+    momentum = getattr(cfg, 'momentum', 0.0)
+    
+    # Create optimizer based on config
+    if optimizer_name == 'Adam':
+        optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate, weight_decay=weight_decay)
+    elif optimizer_name == 'Nadam':
+        optimizer = optim.NAdam(model.parameters(), lr=cfg.learning_rate, weight_decay=weight_decay)
+    elif optimizer_name == 'SGD':
+        optimizer = optim.SGD(model.parameters(), lr=cfg.learning_rate, momentum=momentum, weight_decay=weight_decay)
+    elif optimizer_name == 'AdamW':
+        optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate, weight_decay=weight_decay)
+    else:
+        optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate, weight_decay=weight_decay)
     NUM_EPOCHS = cfg.num_epochs
     
     # For early stopping
