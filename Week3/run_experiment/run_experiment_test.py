@@ -1,5 +1,6 @@
 from typing import *
 from torch.utils.data import DataLoader, Subset, ConcatDataset
+from torchvision.utils import save_image
 from torchvision.datasets import ImageFolder
 import torch
 import torch.nn as nn
@@ -20,26 +21,45 @@ import os
 from torch.utils.data import ConcatDataset
 import os
 
-def get_augmented_datasets(
-    train_path: str,
-    test_path: str,
-    cfg,
-    image_size: int
-):
-    """
-    Augmentation logic identical to run_experiment_cross_val.py
-    (restricted to selected augmentations + zoom)
-    """
+def get_optimizer(model, cfg):
+    params = model.parameters()
+    lr = cfg.learning_rate
+    wd = cfg.get("weight_decay", 0.0)
+    mom = cfg.get("momentum", 0.9)
+    opt_name = cfg.optimizer.lower()
 
+    if opt_name == 'sgd':
+        return optim.SGD(params, lr=lr, momentum=mom, weight_decay=wd)
+    elif opt_name == 'rmsprop':
+        return optim.RMSprop(params, lr=lr, momentum=mom, weight_decay=wd)
+    elif opt_name == 'adagrad':
+        return optim.Adagrad(params, lr=lr, weight_decay=wd)
+    elif opt_name == 'adadelta':
+        return optim.Adadelta(params, lr=lr, weight_decay=wd)
+    elif opt_name == 'adam':
+        return optim.Adam(params, lr=lr, weight_decay=wd)
+    elif opt_name == 'adamax':
+        return optim.Adamax(params, lr=lr, weight_decay=wd)
+    elif opt_name == 'nadam':
+        return optim.NAdam(params, lr=lr, weight_decay=wd)
+    else:
+        print(f"Optimizer {opt_name} not found. Defaulting to Adam.")
+        return optim.Adam(params, lr=lr, weight_decay=wd)
+
+def get_augmented_datasets(train_path: str, test_path: str, cfg, image_size: int):
     train_path = os.path.expanduser(train_path)
     test_path = os.path.expanduser(test_path)
+    
+    norm_transform = []
+    if getattr(cfg, "use_imagenet_norm", False):
+        norm_transform = [F.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     # ---- Base transforms (always applied) ----
     base_transform = F.Compose([
         F.ToImage(),
         F.ToDtype(torch.float32, scale=True),
         F.Resize((image_size, image_size)),
-    ])
+    ] + norm_transform)
 
     test_transform = base_transform
 
@@ -72,7 +92,7 @@ def get_augmented_datasets(
             [F.RandomApply(
                 [F.RandomResizedCrop(
                     image_size,
-                    scale=(0.75, 1.0)
+                    scale=(0.75, 1)
                 )],
                 p=p_val(cfg.aug_zoom)
             )]
@@ -156,6 +176,37 @@ def get_augmented_datasets(
         transform=test_transform
     )
 
+    DEBUG_AUGS = False
+
+    if DEBUG_AUGS:
+        os.makedirs("debug_augs", exist_ok=True)
+
+        # Get a raw sample (NO augmentation)
+        raw_dataset = ImageFolder(
+            train_path,
+            transform=base_transform
+        )
+
+        img, label = raw_dataset[32]   # img: Tensor [C, H, W]
+
+        # Save original
+        save_image(img, "debug_augs/original.png")
+
+        print("Saved: original.png")
+
+        # Save each augmentation independently
+        for aug_name, aug_list in aug_options.items():
+            for i, aug in enumerate(aug_list):
+                augmented_img = aug(img)
+
+                out_path = f"debug_augs/{aug_name}_{i}.png"
+                save_image(augmented_img, out_path)
+
+                print(f"Saved: {out_path}")
+
+        print("\n✅ Augmentation debug images saved. Stopping execution.")
+        exit()
+    
     return train_dataset, test_dataset
 
 
@@ -219,10 +270,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
                                     F.Resize(size=image_size),
                                     #F.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
                                 ])
-    
-    # data_train = ImageFolder("~/mcv/datasets/C3/2425/MIT_large_train/train", transform=transformation)
-    # data_test = ImageFolder("~/mcv/datasets/C3/2425/MIT_large_train/test", transform=transformation) 
-    
+
     # Get dataset name from config or use default
     dataset_name = getattr(cfg, 'dataset_name', 'MIT_large_train')
     
@@ -242,37 +290,33 @@ def run_experiment(wandb_config=None, experiment_config=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Define the model to be used
-    feature_extraction = getattr(cfg, 'feature_extraction', True)
-    blocks_to_keep = getattr(cfg, 'blocks_to_keep', None)
-    out_feat = getattr(cfg, 'out_feat', -1)
-    dropout_prob = getattr(cfg, 'dropout_prob', 0.0)
-    
-    model = WraperModel(
-        num_classes=cfg.output_dim, 
-        feature_extraction=feature_extraction,
-        blocks_to_keep=blocks_to_keep,
-        out_feat=out_feat,
-        dropout_prob=dropout_prob
-    )
-    model = model.to(device)
-    criterion = nn.CrossEntropyLoss()
-    
-    # Get optimizer configuration
-    optimizer_name = getattr(cfg, 'optimizer', 'Adam')
-    weight_decay = getattr(cfg, 'weight_decay', 0.0)
-    momentum = getattr(cfg, 'momentum', 0.0)
-    
-    # Create optimizer based on config
-    if optimizer_name == 'Adam':
-        optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate, weight_decay=weight_decay)
-    elif optimizer_name == 'Nadam':
-        optimizer = optim.NAdam(model.parameters(), lr=cfg.learning_rate, weight_decay=weight_decay)
-    elif optimizer_name == 'SGD':
-        optimizer = optim.SGD(model.parameters(), lr=cfg.learning_rate, momentum=momentum, weight_decay=weight_decay)
-    elif optimizer_name == 'AdamW':
-        optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate, weight_decay=weight_decay)
+    if cfg.get("backbone") == "vit" or cfg.get("backbone") == "swin": 
+        print(f"Using {cfg.get('backbone').upper()} Backbone")
+        model = WraperModel(
+                        num_classes=cfg.output_dim,
+                        feature_extraction=cfg.get("feature_extraction", True),
+                        dropout_prob=cfg.get("dropout_prob", 0.2),
+                        backbone_name=cfg.backbone,
+                    )
+    elif cfg.get("backbone") == "mobilenet_v2":
+        print("Using MobileNetV2 Backbone")
+        model = WraperModel(
+                        num_classes=cfg.output_dim,
+                        feature_extraction=cfg.get("feature_extraction", True),
+                        blocks_to_keep=cfg.get("blocks_to_keep", list(range(14))),
+                        out_feat=cfg.get("out_feat", -1),
+                        dropout_prob=cfg.get("dropout_prob", 0.2),
+                        backbone_name=cfg.backbone,
+                    )
     else:
-        optimizer = optim.Adam(model.parameters(), lr=cfg.learning_rate, weight_decay=weight_decay)
+        # Default fallback if backbone is not specified in config
+        print("Backbone not specified or unknown, defaulting to MobileNetV2")
+        model = WraperModel(num_classes=cfg.output_dim, feature_extraction=True)    
+    
+    model = model.to(device)
+        
+    criterion = nn.CrossEntropyLoss()
+    optimizer = get_optimizer(model, cfg)
     NUM_EPOCHS = cfg.num_epochs
     
     # For early stopping
