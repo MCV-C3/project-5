@@ -155,7 +155,9 @@ def run_experiment(wandb_config=None, experiment_config=None):
         "optimizer": "Adam",
         "momentum": 0.9,
         "weight_decay": 0.0,
-        "dropout_prob": 0.2, # Topology default 
+        "dropout_prob": 0.2, # Topology default
+        "blocks_to_keep": list(range(14)),
+        "out_feat": -1,
     }
     
     # Merge configs
@@ -183,33 +185,6 @@ def run_experiment(wandb_config=None, experiment_config=None):
     ]
     norm_transform = [F.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])] if cfg.use_imagenet_norm else []
 
-    # 2. Dynamic Training Augmentations
-    # train_aug = []
-    
-    # if cfg.aug_horizontal_flip:
-    #     print(f"Using Horizontal Flip Augmentation with p={cfg.aug_horizontal_flip}")
-    #     train_aug.append(F.RandomHorizontalFlip(p=cfg.aug_horizontal_flip))
-        
-    # if cfg.aug_rotation:
-    #     print(f"Using Rotation Augmentation with p={cfg.aug_rotation}")
-    #     train_aug.append(F.RandomApply([F.RandomRotation(degrees=45)], p=cfg.aug_rotation))
-        
-    # if cfg.aug_color_jitter:
-    #     print(f"Using Color Jitter Augmentation with p={cfg.aug_color_jitter}")
-    #     train_aug.append(F.RandomApply([F.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)], p=cfg.aug_color_jitter))
-        
-    # if cfg.aug_zoom > 0:
-    #     print(f"Using Zoom Augmentation with p={cfg.aug_zoom}")
-    #     train_aug.append(F.RandomApply([F.RandomResizedCrop(size=cfg.image_size, scale=(0.75, 1.0))], p=cfg.aug_zoom))
-    # else:
-    #     train_aug.append(F.Resize(size=cfg.image_size))
-        
-    # if cfg.aug_gaussian_blur:
-    #     print(f"Using Gaussian Blur Augmentation with p={cfg.aug_gaussian_blur}")
-    #     train_aug.append(F.RandomApply([F.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 2.0))], p=cfg.aug_gaussian_blur))
-
-    # If add_aug is True, we set all p to 1.0 for selected augs
-    # Otherwise, we use the specific probabilities from config
     p_val = lambda specific_p: max(int(cfg.add_aug), specific_p)
 
     aug_options = {}
@@ -224,15 +199,10 @@ def run_experiment(wandb_config=None, experiment_config=None):
     if cfg.aug_gaussian_blur > 0:
         aug_options['blur'] = [F.RandomApply([F.GaussianBlur((5, 9))], p=p_val(cfg.aug_gaussian_blur))]    # 3. Normalization (Applied last)
     
-    # Finalize Pipelines
-    # transform_train = F.Compose(base_transforms + train_aug + [F.Resize(size=cfg.image_size)] + norm)
-    
-    # transform_test = F.Compose(base_transforms + [F.Resize(size=cfg.image_size)] + norm)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     # --- HISTORY STORAGE ---
-    # history[epoch]['val_acc'] = [fold1, fold2...]
     history = collections.defaultdict(lambda: collections.defaultdict(list))
     
     all_oof_preds = []
@@ -251,24 +221,31 @@ def run_experiment(wandb_config=None, experiment_config=None):
             transform_base=base_transforms, 
             norm_transform=norm_transform
         )
-        # train_loader, val_loader = get_loaders_for_fold(fold_idx=fold+1, 
-        #                                                 batch_size=cfg.batch_size, 
-        #                                                 transform_test=transform_test, 
-        #                                                 transform_train=transform_train,
-        #                                                 num_workers=cfg.num_workers)
-
-        model = WraperModel(num_classes=cfg.output_dim,
+  
+        if cfg.get("backbone") == "vit" or cfg.get("backbone") == "swin": 
+            print("Using ViT/Swin Backbone")
+            model = WraperModel(
+                            num_classes=cfg.output_dim,
+                            feature_extraction=cfg.feature_extraction,
+                            dropout_prob=cfg.dropout_prob,
+                            backbone_name=cfg.backbone,
+                        )
+        elif cfg.get("backbone") == "mobilenet_v2":
+            print("Using MobileNetV2 Backbone")
+            model = WraperModel(
+                            num_classes=cfg.output_dim,
                             feature_extraction=cfg.feature_extraction,
                             blocks_to_keep=cfg.blocks_to_keep,
                             out_feat=cfg.out_feat,
-                            dropout_prob=cfg.dropout_prob)
+                            dropout_prob=cfg.dropout_prob,
+                            backbone_name=cfg.backbone,
+                        )
+        else:
+            raise ValueError(f"Backbone {cfg.get('backbone')} not supported.")
+
         model = model.to(device)
         
         optimizer = get_optimizer(model=model, cfg=cfg)
-        
-        #class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(train_loader.dataset.targets), y=train_loader.dataset.targets)
-        #weights_tensor = torch.tensor(class_weights, dtype=torch.float).to(device)
-        #criterion = nn.CrossEntropyLoss(weight=weights_tensor)
         
         criterion = nn.CrossEntropyLoss()
 
@@ -367,6 +344,7 @@ if __name__ == "__main__":
         {"experiment_name": "aug_blur", "aug_gaussian_blur": 0.2},
         {"experiment_name": "imagenet_norm", "use_imagenet_norm":True}
     ]
+
 
     for exp_cfg in experiments:
         config = {**default_experiment_config, **exp_cfg}

@@ -13,7 +13,7 @@ if __name__ == "__main__":
         "patience": 5,
         "min_delta": 0,
         "save_weights": True,
-        "k_folds": 1
+        "k_folds": 4
     }
     experiments = [
         # {"experiment_name": "baseline"}, # All augs at 0.0
@@ -116,19 +116,73 @@ if __name__ == "__main__":
     experiments = [
         {
             "experiment_name": "expanded_all_augs_imagenet_norm",
-            "aug_horizontal_flip": 0.5,
-            "aug_rotation": 0.3,
-            "aug_color_jitter": 0.2,
-            "aug_zoom": 0.2,
-            "aug_gaussian_blur": 0.2,
+            "aug_horizontal_flip": True,
+            "aug_rotation": True,
+            "aug_color_jitter": True,
+            "aug_zoom": True,
+            "aug_gaussian_blur": True,
             "add_aug": True,
-            "use_imagenet_norm": True
+            "use_imagenet_norm": False
+        }
+    ]
+    experiments = [
+        {
+        
+        "experiment_name": "swin_finetune",
+        "backbone": "swin",
+        "feature_extraction": False,
+        "batch_size": 32,
+        "learning_rate": 3e-4,
+        "use_imagenet_norm": True,
+        }
+        # "dropout_prob": 0.1
+
+    ]    
+    
+    experiments_small = [ # best params small dataset (kfold) bayes search
+        {
+        "batch_size": 64,
+        "dropout_prob": 0.11002281839218377,
+        "learning_rate": 7.00834290308464e-05,
+        "momentum": 0.1523167953194062,
+        "num_epochs": 50,
+        "optimizer": "Nadam",
+        "weight_decay": 2.7431020646302626e-05,
+        "feature_extraction": False,
+        "add_aug": True,
+        "aug_horizontal_flip": True,
+        "aug_rotation": True,
+        "aug_color_jitter": True,
+        "aug_zoom": True,
+        "aug_gaussian_blur": True,
+        "use_imagenet_norm": True,
+        "backbone": "mobilenet",
+        
+        "experiment_name": "best_model_expanded_all_augs_imagenet_norm",
+        }
+    ]
+    
+    experiments = [ # best params big dataset (test)
+        {
+        "batch_size": 256,
+        "dropout_prob": 0.0,
+        "learning_rate": 0.001,
+        "momentum": 0.0,
+        "num_epochs": 20,
+        "optimizer": "Adam",
+        "weight_decay": 0,
+        "feature_extraction": False,
+        "patience": 20,
+        "use_imagenet_norm": True,
+        "backbone": "mobilenet",
+        
+        "experiment_name": "best params big dataset (test)",
         }
     ]
 
     EXPERIMENT_TYPE = "test"  # "cross_val" or "test"
 
-    for exp_cfg in experiments:
+    for exp_cfg in experiments_small:
         config = {**default_experiment_config, **exp_cfg}
         print(f"\n🚀 LAUNCHING EXPERIMENT: {config['experiment_name']}")
         if EXPERIMENT_TYPE == "cross_val":

@@ -7,6 +7,8 @@ from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
 
 from torchvision import models
+from transformers import ViTModel, SwinModel
+
 import matplotlib.pyplot as plt
 
 from typing import *
@@ -40,9 +42,18 @@ class EarlyStopping():
                 self.early_stop = True
 
 class WraperModel(nn.Module):
-    def __init__(self, num_classes: int, feature_extraction: bool=True, blocks_to_keep: Optional[List[int]] = None, out_feat: int = -1, dropout_prob: float = 0.2):
-        super(WraperModel, self).__init__()
+    def __init__(
+        self,
+        num_classes: int,
+        feature_extraction: bool = True,
+        blocks_to_keep: Optional[List[int]] = None,
+        out_feat: int = -1,
+        dropout_prob: float = 0.2,
+        backbone_name: str = "mobilenet"
+    ):
 
+        super(WraperModel, self).__init__()
+        """
         # Load pretrained MobileNet model
         self.backbone = models.mobilenet_v3_large(weights='IMAGENET1K_V1')
         
@@ -74,9 +85,108 @@ class WraperModel(nn.Module):
             # Modify the classifier for the number of classes
             self.backbone.classifier[2] = nn.Dropout(p=dropout_prob, inplace=True)
             self.backbone.classifier[-1] = nn.Linear(self.backbone.classifier[-1].in_features, num_classes)
+        """
+        self.backbone_name = backbone_name
+
+        # ==========================
+        # MobileNet backbone
+        # ==========================
+        if backbone_name == "mobilenet":
+            self.backbone = models.mobilenet_v3_large(weights="IMAGENET1K_V1")
+
+            if feature_extraction:
+                self.set_parameter_requires_grad(feature_extracting=True)
+
+            # ----- BLOCK PRUNING (MobileNet only) -----
+            if blocks_to_keep is not None:
+                all_blocks = list(self.backbone.features.children())
+                self.backbone.features = nn.Sequential(*[all_blocks[i] for i in blocks_to_keep])
+
+                with torch.no_grad():
+                    dummy_input = torch.randn(1, 3, 224, 224)
+                    new_in_channels = self.backbone.features(dummy_input).shape[1]
+                    out_features = (
+                        self.backbone.classifier[0].out_features
+                        if out_feat == -1 else out_feat
+                    )
+
+                self.backbone.classifier = nn.Sequential(
+                    nn.Linear(new_in_channels, out_features),
+                    nn.Hardswish(),
+                    nn.Dropout(p=dropout_prob, inplace=True),
+                    nn.Linear(out_features, num_classes)
+                )
+            else:
+                self.backbone.classifier[2] = nn.Dropout(p=dropout_prob, inplace=True)
+                self.backbone.classifier[-1] = nn.Linear(
+                    self.backbone.classifier[-1].in_features,
+                    num_classes
+                )
+
+        # ==========================
+        # ViT backbone
+        # ==========================
+        elif backbone_name == "vit":
+            self.backbone_name = "vit"
+
+            # ---- Hugging Face ViT backbone ----
+            self.backbone = ViTModel.from_pretrained(
+                "google/vit-base-patch16-224"
+            )
+
+            hidden_dim = self.backbone.config.hidden_size
+
+            # Classification head (CLS token)
+            self.classifier = nn.Sequential(
+                nn.Dropout(dropout_prob),
+                nn.Linear(hidden_dim, num_classes)
+            )
+
+            # Freeze backbone if feature extraction
+            if feature_extraction:
+                for param in self.backbone.parameters():
+                    param.requires_grad = False
+
+            if blocks_to_keep is not None:
+                raise NotImplementedError("blocks_to_keep is not supported for ViT")
+        # ==================================================
+        # Swin (Hugging Face)
+        # ==================================================
+        elif backbone_name == "swin":
+            self.backbone = SwinModel.from_pretrained(
+                "microsoft/swin-tiny-patch4-window7-224"
+            )
+
+            hidden_dim = self.backbone.config.hidden_size
+
+            self.classifier = nn.Sequential(
+                nn.Dropout(dropout_prob),
+                nn.Linear(hidden_dim, num_classes)
+            )
+
+            if feature_extraction:
+                for p in self.backbone.parameters():
+                    p.requires_grad = False
+
+            if blocks_to_keep is not None:
+                raise NotImplementedError("blocks_to_keep not supported for Swin")
+                
+        else:
+            raise ValueError(f"Unknown backbone: {backbone_name}")
+
 
     def forward(self, x):
-        return self.backbone(x)
+        if self.backbone_name == "vit":
+            outputs = self.backbone(pixel_values=x)
+            cls_token = outputs.last_hidden_state[:, 0]  # [B, hidden]
+            return self.classifier(cls_token)
+        elif self.backbone_name == "swin":
+            outputs = self.backbone(pixel_values=x)
+            pooled = outputs.pooler_output
+            return self.classifier(pooled)
+        else:
+            return self.backbone(x)
+
     
 
     def extract_feature_maps_by_block(self, input_image: torch.Tensor):
