@@ -36,30 +36,48 @@ class EarlyStopping():
             if  self.counter == self.patience:
                 self.early_stop = True
 
-class mcvNet(nn.Module):    
-    def __init__(self, image_size: int, num_classes: int = 8):
-        super(mcvNet, self).__init__()
+class MCV_Block(nn.Module):
+    def __init__(self, in_f, out_f, use_bn=False, use_pool=False):
+        super().__init__()
+        layers = [nn.Conv2d(in_f, out_f, kernel_size=3, padding=1)]
         
-        # Block creation function
-        def mcv_block(in_f, out_f):
-            return nn.Sequential(
-                nn.Conv2d(in_f, out_f, kernel_size=3, padding=1),
-                #nn.BatchNorm2d(out_f),
-                nn.ReLU(),
-                #nn.MaxPool2d(2)
-            )
+        if use_bn: layers.append(nn.BatchNorm2d(out_f))
+        
+        layers.append(nn.ReLU())
+        
+        if use_pool: layers.append(nn.MaxPool2d(2))
+            
+        self.block = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.block(x)
+
+class MCV_Net(nn.Module):    
+    def __init__(self, image_size: int, block_type: str = "baseline", num_classes: int = 8):
+        super(MCV_Net, self).__init__()
+        
+        # Configurations for the different types of block architectures
+        configs = {
+            "baseline":   {"use_bn": False, "use_pool": False},
+            "maxpool":    {"use_bn": False, "use_pool": True},
+            "maxpool_bn": {"use_bn": True,  "use_pool": True}
+        }
+        block_cfg = configs[block_type]
         
         # Feature extractor backbone
         self.backbone = nn.Sequential(
-            mcv_block(3, 8),
-            mcv_block(8, 16),
-            mcv_block(16, 32),
+            MCV_Block(3, 8, **block_cfg),
+            MCV_Block(8, 16, **block_cfg),
+            MCV_Block(16, 32, **block_cfg),
         )
         
+        # Calculate number of flatten features before fully connected layer
+        reducer = 8 if block_cfg["use_pool"] else 1
+        flat_features = 32 * (image_size[0] // reducer) * (image_size[1] // reducer)
         # Classifier Head
         self.head = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(32 * image_size[0] * image_size[1], 64),
+            nn.Linear(flat_features, 64),
             nn.ReLU(),
             nn.Linear(64, num_classes)
         )

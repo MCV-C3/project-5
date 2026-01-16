@@ -12,7 +12,7 @@ import wandb
 from sklearn.utils.class_weight import compute_class_weight
 import collections
 
-from models import mcvNet, EarlyStopping
+from models import MCV_Net, EarlyStopping
 from main import train, test
 from metrics import FoldMetrics, compute_distance, compute_efficiency_ratio_metric, get_model_parameters
 
@@ -225,7 +225,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
             norm_transform=norm_transform
         )
   
-        model = mcvNet(image_size=cfg.image_size)
+        model = MCV_Net(image_size=cfg.image_size, block_type=cfg.block_type)
         model = model.to(device)
 
         if num_params is None:
@@ -262,7 +262,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
         # End of Fold
         # Save model weights
         if cfg.save_weights:
-            torch.save(stopper.best_model, f"./saved_models/fold_{fold+1}_{cfg.experiment_name}.pt")
+            torch.save(stopper.best_model, f"./saved_models/fold_{fold+1}_{cfg.block_type}.pt")
         
         model.load_state_dict(stopper.best_model)
         val_pred, val_true, _, _, _ = test(model, val_loader, criterion, device)

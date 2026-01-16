@@ -15,7 +15,7 @@ wandb_config = {
 baseline = {
     'method': 'grid',
     'parameters': {
-        'experiment_name': {
+        'block_type': {
             'values':['baseline']
         },
         'image_size': {
@@ -39,14 +39,97 @@ baseline = {
         'min_delta':{
             'values':[0]
         },
-        'save_weights':{
-            'values':[True]
+        'k_folds': {
+            'values': [4]
+        },
+        'save_weights': {
+            'values': [False]
+        },
+        'num_workers': {
+            'values': [8]
+        }
+    },
+    'metric': {
+        'name': 'test_accuracy',
+        'goal': 'maximize'   
+    }
+}
+
+maxpool = {
+    'method': 'grid',
+    'parameters': {
+        'block_type': {
+            'values':['maxpool']
+        },
+        'image_size': {
+            'values': [(224,224)]
+        },
+        'batch_size': {
+            'values': [256]
+        },
+        'learning_rate': {
+            'values': [0.001]
+        },
+        'output_dim': {
+            'values': [8]
+        },
+        'num_epochs': {
+            'values': [20]
+        }, 
+        'patience':{
+            'values':[-1]
+        },
+        'min_delta':{
+            'values':[0]
         },
         'k_folds': {
             'values': [4]
         },
         'save_weights': {
-            'values': [True]
+            'values': [False]
+        },
+        'num_workers': {
+            'values': [8]
+        }
+    },
+    'metric': {
+        'name': 'test_accuracy',
+        'goal': 'maximize'   
+    }
+}
+
+maxpool_bn = {
+    'method': 'grid',
+    'parameters': {
+        'block_type': {
+            'values':['maxpool_bn']
+        },
+        'image_size': {
+            'values': [(224,224)]
+        },
+        'batch_size': {
+            'values': [256]
+        },
+        'learning_rate': {
+            'values': [0.001]
+        },
+        'output_dim': {
+            'values': [8]
+        },
+        'num_epochs': {
+            'values': [20]
+        }, 
+        'patience':{
+            'values':[-1]
+        },
+        'min_delta':{
+            'values':[0]
+        },
+        'k_folds': {
+            'values': [4]
+        },
+        'save_weights': {
+            'values': [False]
         },
         'num_workers': {
             'values': [8]
