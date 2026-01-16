@@ -299,7 +299,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
     distance = compute_distance(mean_accuracy, num_params)
 
     summary['num_parameters'] = num_params
-    summary['params_in_100k'] = num_params / 1e5
+    summary['params_in_100k'] = num_params / 10**5
     summary['efficiency_ratio_metric'] = efficiency_ratio
     summary['distance'] = distance
 

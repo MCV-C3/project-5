@@ -120,9 +120,7 @@ def compute_distance(accuracy, num_parameters):
     """
     params_in_100k = num_parameters / 10**5
     ideal_x = 0
-    ideal_y = 100
-
-    accuracy = accuracy * 100
+    ideal_y = 1
 
     distance = ((params_in_100k - ideal_x)**2 + (accuracy - ideal_y)**2)**0.5
     return distance
