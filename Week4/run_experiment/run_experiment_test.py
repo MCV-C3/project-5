@@ -14,7 +14,7 @@ import wandb
 
 from models import WraperModel, EarlyStopping
 from main import train, test, plot_computational_graph, plot_metrics
-from metrics import TestMetrics
+from metrics import TestMetrics, compute_distance, compute_efficiency_ratio_metric, get_model_parameters
 
 import os
 
@@ -234,7 +234,10 @@ def run_experiment(wandb_config=None, experiment_config=None):
         "aug_zoom": 0.0,
         "aug_gaussian_blur": 0.0,
         "use_imagenet_norm": False,
-        "add_aug": False
+        "add_aug": False,
+        "optimizer": "Adam",
+        "momentum": 0.9,
+        "weight_decay": 0.0,
     }
     
     # Merge configs
@@ -353,6 +356,16 @@ def run_experiment(wandb_config=None, experiment_config=None):
     # Calculate metrics
     metrics = TestMetrics(test_true, test_pred, test_probs)
     metrics_dict = metrics.compute()
+
+    num_params = get_model_parameters(model)
+    efficiency_ratio = compute_efficiency_ratio_metric(metrics_dict['test_accuracy'], num_params)
+    distance = compute_distance(metrics_dict['test_accuracy'], num_params)
+
+    metrics_dict['num_parameters'] = num_params
+    metrics_dict['params_in_100k'] = num_params / 10**5
+    metrics_dict['efficiency_ratio_metric'] = efficiency_ratio
+    metrics_dict['distance'] = distance
+
     wandb.log(metrics_dict)
     
     #CONFMAT

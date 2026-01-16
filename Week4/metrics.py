@@ -87,6 +87,61 @@ def plot_mean_std_curve(data_dict, title, x_label, y_label, dim = None):
     plt.tight_layout()
     return fig
 
+
+def compute_efficiency_ratio_metric(accuracy, num_parameters):
+    """
+    Compute efficiency metric: accuracy / (number of parameters / 100k)
+    
+    Args:
+        accuracy: Model accuracy (0-100 or 0-1)
+        num_parameters: Total number of model parameters
+    
+    Returns:
+        Efficiency score (higher is better)
+    """
+    params_in_100k = num_parameters / 10**5
+    if params_in_100k == 0:
+        return 0
+    return accuracy / params_in_100k
+
+
+def compute_distance(accuracy, num_parameters):
+    """
+    Compute distance to upper-left corner (0, 100) in the parameter-accuracy plot.
+    X-axis: number of weights (in 100k units)
+    Y-axis: accuracy (0-100 scale)
+    
+    Args:
+        accuracy: Model accuracy (0-1 scale)
+        num_parameters: Total number of model parameters
+    
+    Returns:
+        Euclidean distance to ideal point (0, 100) - lower is better
+    """
+    params_in_100k = num_parameters / 10**5
+    ideal_x = 0
+    ideal_y = 100
+
+    accuracy = accuracy * 100
+
+    distance = ((params_in_100k - ideal_x)**2 + (accuracy - ideal_y)**2)**0.5
+    return distance
+
+
+def get_model_parameters(model):
+    """
+    Count total number of parameters in a PyTorch model.
+    
+    Args:
+        model: PyTorch model
+    
+    Returns:
+        Total number of parameters (trainable + non-trainable)
+    """
+    return sum(p.numel() for p in model.parameters())
+
+
+
 class BaseMetricsComputer:
     """
     Base class for computing core classification metrics.

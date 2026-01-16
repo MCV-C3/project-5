@@ -14,7 +14,7 @@ import collections
 
 from models import mcvNet, EarlyStopping
 from main import train, test
-from metrics import FoldMetrics
+from metrics import FoldMetrics, compute_distance, compute_efficiency_ratio_metric, get_model_parameters
 
 import os
 
@@ -212,6 +212,8 @@ def run_experiment(wandb_config=None, experiment_config=None):
     
     current_idx = 0
 
+    num_params = None
+
     # --- CROSS VALIDATION LOOP ---
     for fold in range(cfg.k_folds):
         print(f"\n--- FOLD {fold + 1}/{cfg.k_folds} ---")
@@ -225,6 +227,10 @@ def run_experiment(wandb_config=None, experiment_config=None):
   
         model = mcvNet(image_size=cfg.image_size)
         model = model.to(device)
+
+        if num_params is None:
+            num_params = get_model_parameters(model)
+            print(f"Model has {num_params:,} parameters ({num_params/1e5:.2f} x 100k)")
         
         optimizer = get_optimizer(model=model, cfg=cfg)
         
@@ -286,7 +292,17 @@ def run_experiment(wandb_config=None, experiment_config=None):
 
     metrics = FoldMetrics(all_oof_targets, all_oof_preds, indices_per_fold)
     metrics_dict = metrics.compute()
-    summary = metrics.get_summary()    
+    summary = metrics.get_summary()
+
+    mean_accuracy = summary['fold_accuracy_mean']
+    efficiency_ratio = compute_efficiency_ratio_metric(mean_accuracy, num_params)
+    distance = compute_distance(mean_accuracy, num_params)
+
+    summary['num_parameters'] = num_params
+    summary['params_in_100k'] = num_params / 1e5
+    summary['efficiency_ratio_metric'] = efficiency_ratio
+    summary['distance'] = distance
+
     wandb.log(metrics_dict)
     wandb.log(summary)
     
