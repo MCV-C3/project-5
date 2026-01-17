@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 from typing import *
 
 from PIL import Image
-import torchvision.transforms.v2  as F
+import torch.nn.functional as F
+import torchvision.transforms.v2  as T
 import numpy as np 
 
 import os
@@ -35,56 +36,124 @@ class EarlyStopping():
             self.counter += 1
             if  self.counter == self.patience:
                 self.early_stop = True
-
-class MCV_Block(nn.Module):
-    def __init__(self, in_f, out_f, use_bn=False, use_pool=False):
-        super().__init__()
-        layers = [nn.Conv2d(in_f, out_f, kernel_size=3, padding=1)]
-        
-        if use_bn: layers.append(nn.BatchNorm2d(out_f))
-        
-        layers.append(nn.ReLU())
-        
-        if use_pool: layers.append(nn.MaxPool2d(2))
-            
-        self.block = nn.Sequential(*layers)
+                
+class SEBlock(nn.Module):
+    def __init__(self, channels, reduction=5):
+        super(SEBlock, self).__init__()
+        self.squeeze = nn.AdaptiveAvgPool2d(1) # Global Average Pool
+        self.excitation = nn.Sequential(
+            nn.Linear(channels, channels // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channels // reduction, channels, bias=False),
+            nn.Sigmoid() # Weight between 0 and 1
+        )
 
     def forward(self, x):
-        return self.block(x)
+        batch_size, num_channels, _, _ = x.size()
+        # Squeeze
+        chan_weights = self.squeeze(x).view(batch_size, num_channels)
+        # Excitation
+        chan_weights = self.excitation(chan_weights).view(batch_size, num_channels, 1, 1)
+        # Scale the original feature maps
+        return x * chan_weights
+
+class MCV_Block(nn.Module):
+    def __init__(self, in_f, out_f, model_cfg, last):
+        super(MCV_Block, self).__init__()
+        layers = [
+            nn.Conv2d(in_f, out_f, kernel_size=3, padding=1, bias=not model_cfg["use_bn"]), # Set bias to False when having a bn layer
+            nn.BatchNorm2d(out_f) if model_cfg["use_bn"] else nn.Identity(), # Batch Norm
+            nn.ReLU() # Activation
+        ]
+        
+        # Attention layer
+        if model_cfg["use_attention"] and last: layers.append(SEBlock(out_f))
+        
+        # Construct the main path
+        self.block = nn.Sequential(*layers)
+        
+        # MaxPool only applied in the last block if there is not GAP layer before FC
+        self.pool = nn.MaxPool2d(2) if model_cfg["use_pool"] and (not model_cfg["use_gap"] or not last) else nn.Identity()
+        
+        # Residual connection
+        self.shortcut = nn.Identity()
+        self.use_residual = model_cfg["use_residual"]
+        if model_cfg["use_residual"] and in_f != out_f:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_f, out_f, kernel_size=1, bias=False),
+                nn.BatchNorm2d(out_f) if model_cfg["use_bn"] else nn.Identity()
+            )
+
+    def forward(self, x):
+        out = self.block(x)
+        
+        if self.use_residual:
+            out = out + self.shortcut(x)
+            out = F.relu(out)
+            
+        out = self.pool(out)
+            
+        return out
+    
+class ClassificationHead(nn.Module):
+    def __init__(self, flat_features, num_classes, model_cfg):
+        super(ClassificationHead, self).__init__()
+        
+        if model_cfg["use_gap"]: 
+            self.layers = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(flat_features, num_classes)  
+            )          
+        else:
+            self.layers = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(flat_features, 64),
+                nn.ReLU(),
+                nn.Linear(64, num_classes)
+            )
+    
+    def forward(self, x):
+        return self.layers(x)
 
 class MCV_Net(nn.Module):    
-    def __init__(self, image_size: int, block_type: str = "baseline", num_classes: int = 8):
+    def __init__(self, image_size: int, block_type: str = "baseline", num_classes: int = 8, init_chan: int = 20, num_blocks: int = 4):
         super(MCV_Net, self).__init__()
         
         # Configurations for the different types of block architectures
         configs = {
-            "baseline":   {"use_bn": False, "use_pool": False},
-            "maxpool":    {"use_bn": False, "use_pool": True},
-            "maxpool_bn": {"use_bn": True,  "use_pool": True}
+            "baseline":   {"use_bn": False, "use_pool": False, "use_gap": False, "use_attention": False, "use_residual": False},
+            "maxpool":    {"use_bn": False, "use_pool": True, "use_gap": False, "use_attention": False, "use_residual": False},
+            "maxpool_gap": {"use_bn": False,  "use_pool": True, "use_gap": True, "use_attention": False, "use_residual": False},
+            "maxpool_gap_bn": {"use_bn": True,  "use_pool": True, "use_gap": True, "use_attention": False, "use_residual": False},
+            "maxpool_gap_r": {"use_bn": False,  "use_pool": True, "use_gap": True, "use_attention": False, "use_residual": True},
         }
-        block_cfg = configs[block_type]
+        self.model_cfg = configs[block_type]
+        
+        blocks = [MCV_Block(3, init_chan, self.model_cfg, last=False)]
+        if num_blocks > 1:
+            mid_blocks=[MCV_Block(init_chan * i, init_chan * (i+1), self.model_cfg, last=False) for i in range (1, num_blocks-1)]
+            blocks.extend(mid_blocks)
+            blocks.append(MCV_Block(init_chan * (num_blocks-1), init_chan * num_blocks, self.model_cfg, last=True))
         
         # Feature extractor backbone
-        self.backbone = nn.Sequential(
-            MCV_Block(3, 8, **block_cfg),
-            MCV_Block(8, 16, **block_cfg),
-            MCV_Block(16, 32, **block_cfg),
-        )
+        self.backbone = nn.Sequential(*blocks)
         
-        # Calculate number of flatten features before fully connected layer
-        reducer = 8 if block_cfg["use_pool"] else 1
-        flat_features = 32 * (image_size[0] // reducer) * (image_size[1] // reducer)
-        # Classifier Head
-        self.head = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(flat_features, 64),
-            nn.ReLU(),
-            nn.Linear(64, num_classes)
-        )
+        # Calculate number of flatten features before classification head
+        if self.model_cfg["use_gap"]: 
+            self.gap = nn.AdaptiveAvgPool2d(1) # Creates GAP layer
+            flat_features = init_chan * num_blocks
+        else:
+            reducer = 2**num_blocks if self.model_cfg["use_pool"] else 1
+            flat_features = init_chan * num_blocks * (image_size[0] // reducer) * (image_size[1] // reducer)
+        
+        # Classification Head
+        self.head = ClassificationHead(flat_features, num_classes, self.model_cfg)
 
     def forward(self, x):
         features = self.backbone(x)
+        if self.model_cfg["use_gap"]: features = self.gap(features)
         logits = self.head(features)
+        
         return logits
 
     def extract_feature_maps_by_block(self, input_image: torch.Tensor):
@@ -214,10 +283,10 @@ if __name__ == "__main__":
     for i, layer in enumerate(model.backbone.features):
         print(f"Index {i}: {layer}")"""
 
-    transformation  = F.Compose([
-                                    F.ToImage(),
-                                    F.ToDtype(torch.float32, scale=True),
-                                    F.Resize(size=IMG_SIZE),
+    transformation  = T.Compose([
+                                    T.ToImage(),
+                                    T.ToDtype(torch.float32, scale=True),
+                                    T.Resize(size=IMG_SIZE),
                                 ])
     # Example GradCAM usage
     path = os.path.expanduser("~/mcv/datasets/C3/2425/MIT_small_train_1/test/street/bost46.jpg")

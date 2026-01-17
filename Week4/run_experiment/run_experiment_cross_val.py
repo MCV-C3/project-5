@@ -1,6 +1,7 @@
 from typing import *
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
+import gc
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -17,6 +18,7 @@ from main import train, test
 from metrics import FoldMetrics, compute_distance, compute_efficiency_ratio_metric, get_model_parameters
 
 import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 BASE_PATH = "~/mcv/datasets/C3/2425/"
 
@@ -139,7 +141,6 @@ def run_experiment(wandb_config=None, experiment_config=None):
         "batch_size": 256,
         "num_epochs": 20,
         "learning_rate": 0.001,
-        "output_dim": 11,
         "num_workers": 8,
         "patience": 5,
         "min_delta": 0,
@@ -156,8 +157,6 @@ def run_experiment(wandb_config=None, experiment_config=None):
         "momentum": 0.9,
         "weight_decay": 0.0,
         "dropout_prob": 0.2, # Topology default
-        "blocks_to_keep": list(range(14)),
-        "out_feat": -1,
     }
     
     # Merge configs
@@ -178,8 +177,31 @@ def run_experiment(wandb_config=None, experiment_config=None):
     print(f"Starting experiment with config: {cfg}")
     
     torch.manual_seed(42)
+    
+    test_transform = F.Compose([
+        F.ToImage(),
+        F.ToDtype(torch.float32, scale=True),
+        F.Resize(size=cfg.image_size),
+        F.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    
+    if cfg.data_aug:
+        train_transform = F.Compose([
+            F.ToImage(),
+            
+            F.RandomResizedCrop(size=cfg.image_size, scale=(0.75, 1.0), antialias=True), # Performs resize + crop
+            F.RandomHorizontalFlip(p=0.5),
+            F.RandomRotation(degrees=20),
+            F.RandomApply([F.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)], p=0.3),
+            F.RandomApply([F.GaussianBlur(kernel_size=(5, 5), sigma=(0.1, 2.0))], p=0.15),
+            
+            F.ToDtype(torch.float32, scale=True),
+            F.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+    else:
+        train_transform = test_transform
 
-    base_transforms = [
+    """base_transforms = [
         F.ToImage(),
         F.ToDtype(torch.float32, scale=True),
         F.Resize(size=cfg.image_size),
@@ -198,7 +220,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
     if cfg.aug_zoom > 0:
         aug_options['zoom'] = [F.RandomApply([F.RandomResizedCrop(cfg.image_size, scale=(0.75, 1.0))], p=p_val(cfg.aug_zoom))]
     if cfg.aug_gaussian_blur > 0:
-        aug_options['blur'] = [F.RandomApply([F.GaussianBlur((5, 9))], p=p_val(cfg.aug_gaussian_blur))]    # 3. Normalization (Applied last)
+        aug_options['blur'] = [F.RandomApply([F.GaussianBlur((5, 9))], p=p_val(cfg.aug_gaussian_blur))]    # 3. Normalization (Applied last)"""
     
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -217,15 +239,21 @@ def run_experiment(wandb_config=None, experiment_config=None):
     # --- CROSS VALIDATION LOOP ---
     for fold in range(cfg.k_folds):
         print(f"\n--- FOLD {fold + 1}/{cfg.k_folds} ---")
-        train_loader, val_loader = get_augmented_loaders(
+        """train_loader, val_loader = get_augmented_loaders(
             fold_idx=fold+1, 
             cfg=cfg, 
             aug_options=aug_options,
             transform_base=base_transforms, 
             norm_transform=norm_transform
-        )
+        )"""
+        
+        train_loader, val_loader = get_loaders_for_fold(fold_idx=fold+1, 
+                                                        batch_size=cfg.batch_size, 
+                                                        num_workers=cfg.num_workers,
+                                                        transform_test=test_transform,
+                                                        transform_train=train_transform)
   
-        model = MCV_Net(image_size=cfg.image_size, block_type=cfg.block_type)
+        model = MCV_Net(image_size=cfg.image_size, block_type=cfg.block_type, init_chan=cfg.init_chan, num_blocks=cfg.num_blocks)
         model = model.to(device)
 
         if num_params is None:
@@ -280,6 +308,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
         current_idx += num_samples
 
         del train_loader, val_loader, model, optimizer, criterion
+        gc.collect()
         if device.type == 'cuda':
             torch.cuda.empty_cache()
             torch.cuda.synchronize()

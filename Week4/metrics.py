@@ -7,73 +7,60 @@ from sklearn.metrics import (
     confusion_matrix, roc_auc_score, roc_curve, ConfusionMatrixDisplay,
 )
 
-# --- PLOTTING FUNCTION ---
-def plot_mean_std_curve(data_dict, title, x_label, y_label, dim = None):
+def plot_mean_std_curve(data_dict, title, x_label, y_label, best_epoch=None, dim=None):
     """
-    Plots multiple curves (e.g. Train vs Val) with Mean lines and Std Dev shading.
+    Plots multiple curves with Mean lines and Std Dev shading, plus a marker for the best epoch.
     
     Args:
-        data_dict (dict): {
-            'Train': { epoch1: [v1, v2..], epoch2: ... },
-            'Validation': { epoch1: [v1, v2..], epoch2: ... }
-        }
+        data_dict (dict): Data structure with Train/Validation metrics.
+        title (str): Plot title.
+        x_label (str): X-axis label.
+        y_label (str): Y-axis label.
+        best_epoch (int, optional): The epoch index where min validation loss occurred.
+        dim (tuple, optional): (ymin, ymax) limits.
     """
     plt.style.use('seaborn-v0_8-whitegrid')
     
     fig, ax = plt.subplots(figsize=(10, 6))
     
-    # Define colors for Train vs Validation
     styles = {
-        'Train':      {'color': '#1f77b4', 'marker': 'o', 'label': 'Train'},      # Blue
-        'Validation': {'color': '#d62728', 'marker': 's', 'label': 'Validation'}  # Red
+        'Train':      {'color': '#1f77b4', 'marker': 'o', 'label': 'Train'},
+        'Validation': {'color': '#d62728', 'marker': 's', 'label': 'Validation'}
     }
     
-    # Iterate over 'Train' and 'Validation'
     for name, metrics_per_x in data_dict.items():
-        
-        # 1. Prepare Data
         sorted_x = sorted(metrics_per_x.keys())
-        means = []
-        stds = []
-        
-        for x_val in sorted_x:
-            values = np.array(metrics_per_x[x_val])
-            means.append(np.mean(values))
-            stds.append(np.std(values))
+        means = [np.mean(metrics_per_x[x]) for x in sorted_x]
+        stds = [np.std(metrics_per_x[x]) for x in sorted_x]
             
-        means = np.array(means)
-        stds = np.array(stds)
-        x_vals = np.array(sorted_x)
-        
-        # Get style
+        means, stds, x_vals = np.array(means), np.array(stds), np.array(sorted_x)
         style = styles.get(name, {'color': 'black', 'marker': 'x', 'label': name})
         
-        # 2. Plot MEAN Line
-        ax.plot(x_vals, means, 
-                color=style['color'], 
-                marker=style['marker'], 
-                markersize=5, 
-                linewidth=2, 
-                label=f"{name} Mean",
-                zorder=3)
+        ax.plot(x_vals, means, color=style['color'], marker=style['marker'], 
+                markersize=5, linewidth=2, label=f"{name} Mean", zorder=3)
         
-        # 3. Plot SHADED BAND
-        ax.fill_between(x_vals, 
-                        means - stds, 
-                        means + stds, 
-                        color=style['color'], 
-                        alpha=0.15, # Light transparency
-                        zorder=2)
+        ax.fill_between(x_vals, means - stds, means + stds, 
+                        color=style['color'], alpha=0.15, zorder=2)
+
+    # --- Vertical Line for Best Epoch (Min val loss) ---
+    if best_epoch is not None:
+        ax.axvline(x=best_epoch, color='gray', linestyle='--', linewidth=1.5, 
+                   label=f'Min Val Loss', zorder=1)
+        
+        # Add a text label at the top of the line
+        _, y_max = ax.get_ylim() if dim is None else dim
+        ax.text(best_epoch, y_max, f' Epoch {best_epoch}', 
+                color='gray', fontweight='bold', va='bottom', ha='center')
 
     # --- Axes and Legend ---
-    ax.set_xlabel(x_label, fontsize=12, labelpad=10)
-    ax.set_ylabel(y_label, fontsize=12, labelpad=10)
-    ax.set_title(title, fontsize=14, fontweight='bold', pad=15)
+    ax.set_xlabel(x_label, fontsize=14, labelpad=10)
+    ax.set_ylabel(y_label, fontsize=14, labelpad=10)
+    ax.set_title(title, fontsize=16, fontweight='bold', pad=15)
+    ax.tick_params(axis='both', which='major', labelsize=14)
     
-    if dim != None:
+    if dim is not None:
         ax.set_ylim(dim[0], dim[1])
     
-    # Force integer ticks for epochs
     if len(x_vals) > 0:
         ax.xaxis.get_major_locator().set_params(integer=True)
 
@@ -354,6 +341,8 @@ class FoldMetrics:
             
             loss_data_plot['Train'][ep_idx] = metrics['train_loss']
             loss_data_plot['Validation'][ep_idx] = metrics['val_loss']
+            
+        val_means = {epoch: np.mean(values) for epoch, values in loss_data_plot['Validation'].items()}
 
         # 2. Generate Accuracy Plot (Both Train & Val)
         fig_acc = plot_mean_std_curve(
@@ -361,6 +350,7 @@ class FoldMetrics:
             title="Accuracy Evolution", 
             x_label="Epoch", 
             y_label="Accuracy",
+            best_epoch = min(val_means, key=val_means.get),
             dim = [-0.1, 1.1]
         )
         
@@ -370,7 +360,8 @@ class FoldMetrics:
             title="Loss Evolution", 
             x_label="Epoch",
             y_label="Loss",
-            dim = [-0.1, 4]
+            best_epoch = min(val_means, key=val_means.get),
+            dim = [-0.1, 2.2]
         )
         
         return fig_acc, fig_loss
