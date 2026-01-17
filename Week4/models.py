@@ -123,6 +123,7 @@ class MCV_Net(nn.Module):
         configs = {
             "baseline":   {"use_bn": False, "use_pool": False, "use_gap": False, "use_attention": False, "use_residual": False},
             "maxpool":    {"use_bn": False, "use_pool": True, "use_gap": False, "use_attention": False, "use_residual": False},
+            "maxpool_bn": {"use_bn": True, "use_pool": True, "use_gap": False, "use_attention": False, "use_residual": False},
             "maxpool_gap": {"use_bn": False,  "use_pool": True, "use_gap": True, "use_attention": False, "use_residual": False},
             "maxpool_gap_bn": {"use_bn": True,  "use_pool": True, "use_gap": True, "use_attention": False, "use_residual": False},
             "maxpool_gap_r": {"use_bn": False,  "use_pool": True, "use_gap": True, "use_attention": False, "use_residual": True},

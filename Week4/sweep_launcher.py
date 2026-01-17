@@ -177,6 +177,63 @@ maxpool_data_aug = {
     }
 }
 
+# From here ALWAYS DATA AUG
+
+maxpool_bn = {
+    'method': 'grid',
+    'parameters': {
+        'block_type': {
+            'values':['maxpool_bn']
+        },
+        'optimizer': {
+            'values':[("Adam")]
+        },
+        'image_size': {
+            'values': [(224,224)]
+        },
+        'batch_size': {
+            'values': [256]
+        },
+        'learning_rate': {
+            'values': [0.001]
+        },
+        'output_dim': {
+            'values': [8]
+        },
+        'num_epochs': {
+            'values': [20]
+        }, 
+        'data_aug': {
+            'values':[True]
+        },
+        'init_chan': {
+            'values': [20]
+        },
+        'num_blocks':{
+            'values': [4]
+        },
+        'patience':{
+            'values':[-1]
+        },
+        'min_delta':{
+            'values':[0]
+        },
+        'k_folds': {
+            'values': [1]
+        },
+        'save_weights': {
+            'values': [False]
+        },
+        'num_workers': {
+            'values': [8]
+        }
+    },
+    'metric': {
+        'name': 'test_accuracy',
+        'goal': 'maximize'   
+    }
+}
+
 maxpool_gap = {
     'method': 'grid',
     'parameters': {
@@ -202,10 +259,10 @@ maxpool_gap = {
             'values': [20]
         }, 
         'data_aug': {
-            'values':[False]
+            'values':[True]
         },
         'init_chan': {
-            'values': [30]
+            'values': [20]
         },
         'num_blocks':{
             'values': [4]
@@ -217,7 +274,7 @@ maxpool_gap = {
             'values':[0]
         },
         'k_folds': {
-            'values': [1]
+            'values': [4]
         },
         'save_weights': {
             'values': [False]
@@ -403,7 +460,7 @@ def run_experiment_with_wandb_config():
     run_experiment(wandb_config=wandb_config)
 
 if __name__ == "__main__":
-    sweep_id = wandb.sweep(maxpool_gap, project=wandb_config["project"], entity=wandb_config["entity"])
+    sweep_id = wandb.sweep(maxpool_bn, project=wandb_config["project"], entity=wandb_config["entity"])
     print(f"Initiated sweep with ID: {sweep_id}")
 
     if DO_HYPERPARAM_SEARCH:
