@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt
-from models import SimpleModel, WraperModel
+from models import WraperModel
 import torchvision.transforms.v2  as F
 from torchviz import make_dot
 import tqdm
@@ -19,6 +19,7 @@ def train(model, dataloader, criterion, optimizer, device):
     model.train()
     train_loss = 0.0
     correct, total = 0, 0
+    all_predicted, all_labels, all_probabilities = [], [], []
 
     for inputs, labels in dataloader:
         inputs, labels = inputs.to(device), labels.to(device)
@@ -37,16 +38,21 @@ def train(model, dataloader, criterion, optimizer, device):
         _, predicted = outputs.max(1)
         correct += (predicted == labels).sum().item()
         total += labels.size(0)
+        
+        # Track true labels, predicted labels and probabilities for each class
+        all_predicted.extend(predicted.cpu().numpy())
+        all_labels.extend(labels.cpu().numpy())
 
     avg_loss = train_loss / total
     accuracy = correct / total
-    return avg_loss, accuracy
+    return all_predicted, all_labels, avg_loss, accuracy
 
 
 def test(model, dataloader, criterion, device):
     model.eval()
     test_loss = 0.0
     correct, total = 0, 0
+    all_predicted, all_labels, all_probabilities = [], [], []
 
     with torch.no_grad():
         for inputs, labels in dataloader:
@@ -61,10 +67,18 @@ def test(model, dataloader, criterion, device):
             _, predicted = outputs.max(1)
             correct += (predicted == labels).sum().item()
             total += labels.size(0)
+            
+            # Get Soft Probabilities
+            probs = torch.softmax(outputs, dim=1)
+            
+            # Track true labels, predicted labels and probabilities for each class
+            all_predicted.extend(predicted.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            all_probabilities.extend(probs.cpu().numpy())
 
     avg_loss = test_loss / total
     accuracy = correct / total
-    return avg_loss, accuracy
+    return all_predicted, all_labels, all_probabilities, avg_loss, accuracy
 
 def plot_metrics(train_metrics: Dict, test_metrics: Dict, metric_name: str):
     """
@@ -79,7 +93,7 @@ def plot_metrics(train_metrics: Dict, test_metrics: Dict, metric_name: str):
         - loss.png for loss plots
         - metrics.png for other metrics plots
     """
-    plt.figure(figsize=(10, 6))
+    fig = plt.figure(figsize=(10, 6))
     plt.plot(train_metrics[metric_name], label=f'Train {metric_name.capitalize()}')
     plt.plot(test_metrics[metric_name], label=f'Test {metric_name.capitalize()}')
     plt.xlabel('Epoch')
@@ -88,12 +102,7 @@ def plot_metrics(train_metrics: Dict, test_metrics: Dict, metric_name: str):
     plt.legend()
     plt.grid(True)
 
-    # Save the plot with the appropriate name
-    filename = "loss.png" if metric_name.lower() == "loss" else "metrics.png"
-    plt.savefig(filename)
-    print(f"Plot saved as {filename}")
-
-    plt.close()  # Close the figure to free memory
+    return fig
 
 # Data augmentation example
 def get_data_transforms():
