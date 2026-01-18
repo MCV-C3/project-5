@@ -25,7 +25,7 @@ baseline = {
             'values': [(224,224)]
         },
         'batch_size': {
-            'values': [256]
+            'values': [16]
         },
         'learning_rate': {
             'values': [0.001]
@@ -80,7 +80,7 @@ maxpool = {
             'values': [(224,224)]
         },
         'batch_size': {
-            'values': [256]
+            'values': [16]
         },
         'learning_rate': {
             'values': [0.001]
@@ -122,11 +122,11 @@ maxpool = {
     }
 }
 
-maxpool_data_aug = {
+maxpool_bn = {
     'method': 'grid',
     'parameters': {
         'block_type': {
-            'values':['maxpool']
+            'values':['maxpool_bn']
         },
         'optimizer': {
             'values':[("Adam")]
@@ -135,7 +135,62 @@ maxpool_data_aug = {
             'values': [(224,224)]
         },
         'batch_size': {
-            'values': [256]
+            'values': [16]
+        },
+        'learning_rate': {
+            'values': [0.001]
+        },
+        'output_dim': {
+            'values': [8]
+        },
+        'num_epochs': {
+            'values': [20]
+        }, 
+        'data_aug': {
+            'values':[False]
+        },
+        'init_chan': {
+            'values': [20]
+        },
+        'num_blocks':{
+            'values': [4]
+        },
+        'patience':{
+            'values':[-1]
+        },
+        'min_delta':{
+            'values':[0]
+        },
+        'k_folds': {
+            'values': [4]
+        },
+        'save_weights': {
+            'values': [False]
+        },
+        'num_workers': {
+            'values': [8]
+        }
+    },
+    'metric': {
+        'name': 'test_accuracy',
+        'goal': 'maximize'   
+    }
+}
+
+maxpool_bn_data_aug = {
+    'method': 'grid',
+    'parameters': {
+        'block_type': {
+            'values':['maxpool_bn']
+        },
+        'optimizer': {
+            'values':[("Adam")]
+        },
+        'image_size': {
+            'values': [(224,224)]
+        },
+        'batch_size': {
+            'values': [16]
         },
         'learning_rate': {
             'values': [0.001]
@@ -179,11 +234,11 @@ maxpool_data_aug = {
 
 # From here ALWAYS DATA AUG
 
-maxpool_bn = {
+maxpool_gap_bn = {
     'method': 'grid',
     'parameters': {
         'block_type': {
-            'values':['maxpool_bn']
+            'values':['maxpool_gap_bn']
         },
         'optimizer': {
             'values':[("Adam")]
@@ -192,62 +247,7 @@ maxpool_bn = {
             'values': [(224,224)]
         },
         'batch_size': {
-            'values': [256]
-        },
-        'learning_rate': {
-            'values': [0.001]
-        },
-        'output_dim': {
-            'values': [8]
-        },
-        'num_epochs': {
-            'values': [20]
-        }, 
-        'data_aug': {
-            'values':[True]
-        },
-        'init_chan': {
-            'values': [20]
-        },
-        'num_blocks':{
-            'values': [4]
-        },
-        'patience':{
-            'values':[-1]
-        },
-        'min_delta':{
-            'values':[0]
-        },
-        'k_folds': {
-            'values': [1]
-        },
-        'save_weights': {
-            'values': [False]
-        },
-        'num_workers': {
-            'values': [8]
-        }
-    },
-    'metric': {
-        'name': 'test_accuracy',
-        'goal': 'maximize'   
-    }
-}
-
-maxpool_gap = {
-    'method': 'grid',
-    'parameters': {
-        'block_type': {
-            'values':['maxpool_gap']
-        },
-        'optimizer': {
-            'values':[("Adam")]
-        },
-        'image_size': {
-            'values': [(224,224)]
-        },
-        'batch_size': {
-            'values': [256]
+            'values': [16]
         },
         'learning_rate': {
             'values': [0.001]
@@ -289,11 +289,11 @@ maxpool_gap = {
     }
 }
 
-maxpool_gap_r = {
+maxpool_gap_bn_dw = {
     'method': 'grid',
     'parameters': {
         'block_type': {
-            'values':['maxpool_gap_r']
+            'values':['maxpool_gap_bn_dw']
         },
         'optimizer': {
             'values':[("Adam")]
@@ -302,7 +302,7 @@ maxpool_gap_r = {
             'values': [(224,224)]
         },
         'batch_size': {
-            'values': [256]
+            'values': [16]
         },
         'learning_rate': {
             'values': [0.001]
@@ -320,8 +320,63 @@ maxpool_gap_r = {
             'values': [20]
         },
         'num_blocks':{
+            'values': [2,3,4,5]
+        },
+        'patience':{
+            'values':[-1]
+        },
+        'min_delta':{
+            'values':[0]
+        },
+        'k_folds': {
             'values': [4]
         },
+        'save_weights': {
+            'values': [False]
+        },
+        'num_workers': {
+            'values': [8]
+        }
+    },
+    'metric': {
+        'name': 'test_accuracy',
+        'goal': 'maximize'   
+    }
+}
+
+number_of_filters = {
+    'method': 'grid',
+    'parameters': {
+        'block_type': {
+            'values':['maxpool_gap_bn_dw']
+        },
+        'optimizer': {
+            'values':[("Adam")]
+        },
+        'image_size': {
+            'values': [(224,224)]
+        },
+        'batch_size': {
+            'values': [16]
+        },
+        'learning_rate': {
+            'values': [0.001]
+        },
+        'output_dim': {
+            'values': [8]
+        },
+        'num_epochs': {
+            'values': [20]
+        }, 
+        'data_aug': {
+            'values':[True]
+        },
+        'init_chan': {
+            'values': [5,10,12,15,20]
+        },
+        'num_blocks':{
+            'values': [5]
+        },
         'patience':{
             'values':[-1]
         },
@@ -329,7 +384,7 @@ maxpool_gap_r = {
             'values':[0]
         },
         'k_folds': {
-            'values': [1]
+            'values': [4]
         },
         'save_weights': {
             'values': [False]
@@ -344,11 +399,11 @@ maxpool_gap_r = {
     }
 }
 
-attention = {
+maxpool_gap_bn_dw_at = {
     'method': 'grid',
     'parameters': {
         'block_type': {
-            'values':['maxpool_gap_attention']
+            'values':['maxpool_gap_bn_dw_at']
         },
         'optimizer': {
             'values':[("Adam")]
@@ -357,7 +412,117 @@ attention = {
             'values': [(224,224)]
         },
         'batch_size': {
-            'values': [256]
+            'values': [16]
+        },
+        'learning_rate': {
+            'values': [0.001]
+        },
+        'output_dim': {
+            'values': [8]
+        },
+        'num_epochs': {
+            'values': [20]
+        }, 
+        'data_aug': {
+            'values':[True]
+        },
+        'init_chan': {
+            'values': [15]
+        },
+        'num_blocks':{
+            'values': [5]
+        },
+        'patience':{
+            'values':[-1]
+        },
+        'min_delta':{
+            'values':[0]
+        },
+        'k_folds': {
+            'values': [4]
+        },
+        'save_weights': {
+            'values': [False]
+        },
+        'num_workers': {
+            'values': [8]
+        }
+    },
+    'metric': {
+        'name': 'test_accuracy',
+        'goal': 'maximize'   
+    }
+}
+
+maxpool_gap_bn_dw_r = {
+    'method': 'grid',
+    'parameters': {
+        'block_type': {
+            'values':['maxpool_gap_bn_dw_r']
+        },
+        'optimizer': {
+            'values':[("Adam")]
+        },
+        'image_size': {
+            'values': [(224,224)]
+        },
+        'batch_size': {
+            'values': [16]
+        },
+        'learning_rate': {
+            'values': [0.001]
+        },
+        'output_dim': {
+            'values': [8]
+        },
+        'num_epochs': {
+            'values': [20]
+        }, 
+        'data_aug': {
+            'values':[True]
+        },
+        'init_chan': {
+            'values': [15]
+        },
+        'num_blocks':{
+            'values': [5]
+        },
+        'patience':{
+            'values':[-1]
+        },
+        'min_delta':{
+            'values':[0]
+        },
+        'k_folds': {
+            'values': [4]
+        },
+        'save_weights': {
+            'values': [False]
+        },
+        'num_workers': {
+            'values': [8]
+        }
+    },
+    'metric': {
+        'name': 'test_accuracy',
+        'goal': 'maximize'   
+    }
+}
+
+image_size = {
+    'method': 'grid',
+    'parameters': {
+        'block_type': {
+            'values':['maxpool_gap_bn_dw_sh']
+        },
+        'optimizer': {
+            'values':[("Adam")]
+        },
+        'image_size': {
+            'values': [(224,224)]
+        },
+        'batch_size': {
+            'values': [16]
         },
         'learning_rate': {
             'values': [0.001]
@@ -374,63 +539,11 @@ attention = {
         'init_chan': {
             'values': [20]
         },
-        'num_blocks':{
-            'values': [2]
-        },
-        'patience':{
-            'values':[-1]
-        },
-        'min_delta':{
-            'values':[0]
-        },
-        'k_folds': {
-            'values': [1]
-        },
-        'save_weights': {
-            'values': [False]
-        },
-        'num_workers': {
-            'values': [8]
-        }
-    },
-    'metric': {
-        'name': 'test_accuracy',
-        'goal': 'maximize'   
-    }
-}
-
-num_blocks = {
-    'method': 'grid',
-    'parameters': {
-        'block_type': {
-            'values':['maxpool_gap']
-        },
-        'optimizer': {
-            'values':[("Adam")]
-        },
-        'image_size': {
-            'values': [(224,224)]
-        },
-        'batch_size': {
-            'values': [256]
-        },
-        'learning_rate': {
-            'values': [0.001]
-        },
-        'output_dim': {
-            'values': [8]
-        },
-        'num_epochs': {
-            'values': [20]
-        }, 
-        'data_aug': {
-            'values':[True]
-        },
-        'init_chan': {
-            'values': [20]
+        'filters': {
+            'values': [[10,20,40,80,160]]
         },
         'num_blocks':{
-            'values': [2]
+            'values': [5]
         },
         'patience':{
             'values':[-1]
@@ -460,7 +573,7 @@ def run_experiment_with_wandb_config():
     run_experiment(wandb_config=wandb_config)
 
 if __name__ == "__main__":
-    sweep_id = wandb.sweep(maxpool_bn, project=wandb_config["project"], entity=wandb_config["entity"])
+    sweep_id = wandb.sweep(image_size, project=wandb_config["project"], entity=wandb_config["entity"])
     print(f"Initiated sweep with ID: {sweep_id}")
 
     if DO_HYPERPARAM_SEARCH:

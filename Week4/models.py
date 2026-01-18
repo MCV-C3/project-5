@@ -37,6 +37,28 @@ class EarlyStopping():
             if  self.counter == self.patience:
                 self.early_stop = True
                 
+class ChannelShuffle(nn.Module):
+    def __init__(self, groups):
+        super(ChannelShuffle, self).__init__()
+        self.groups = groups
+
+    def forward(self, x):
+        batch_size, num_channels, height, width = x.size()
+        channels_per_group = num_channels // self.groups
+        
+        # Step 1: Reshape into (N, groups, channels_per_group, H, W)
+        # This prepares the tensor for the transposition
+        x = x.view(batch_size, self.groups, channels_per_group, height, width)
+        
+        # Step 2: Transpose (swap) the group and channel-per-group dimensions
+        # This is the 'shuffle' step
+        x = x.transpose(1, 2).contiguous()
+        
+        # Step 3: Flatten back to (N, C, H, W) for the next convolution
+        x = x.view(batch_size, num_channels, height, width)
+        
+        return x
+                
 class SEBlock(nn.Module):
     def __init__(self, channels, reduction=5):
         super(SEBlock, self).__init__()
@@ -58,22 +80,48 @@ class SEBlock(nn.Module):
         return x * chan_weights
 
 class MCV_Block(nn.Module):
-    def __init__(self, in_f, out_f, model_cfg, last):
+    def __init__(self, in_f, out_f, model_cfg, first, last):
         super(MCV_Block, self).__init__()
-        layers = [
-            nn.Conv2d(in_f, out_f, kernel_size=3, padding=1, bias=not model_cfg["use_bn"]), # Set bias to False when having a bn layer
-            nn.BatchNorm2d(out_f) if model_cfg["use_bn"] else nn.Identity(), # Batch Norm
-            nn.ReLU() # Activation
-        ]
+        g = 5 if in_f % 5 == 0 and out_f % 5 == 0 else 4
+        
+        if model_cfg["use_dw"] and not first:
+            # Depthwise convolutions
+            layers = [
+                nn.Conv2d(in_f, in_f, kernel_size=3, padding=1, stride=1, groups=in_f, bias=not model_cfg["use_bn"]), # Convolutions applied per-channel
+                nn.BatchNorm2d(in_f) if model_cfg["use_bn"] else nn.Identity(), # Batch Norm
+                nn.ReLU(), # Activation
+                nn.Conv2d(in_f, out_f, kernel_size=1, groups=g if model_cfg["use_shuffle"] and not last else 1, bias=not model_cfg["use_bn"]), # 1x1 convolution to mix channels
+                nn.BatchNorm2d(out_f) if model_cfg["use_bn"] else nn.Identity(), # Batch Norm
+                ChannelShuffle(groups=g) if model_cfg["use_shuffle"] and not last else nn.Identity(), # Shuffle
+                nn.ReLU() # Activation
+            ]
+        else:
+            # Traditional convolution for the first layer and when not using depthwise convolutions
+            layers = [
+                nn.Conv2d(in_f, out_f, kernel_size=3, stride=1, padding=1, bias=not model_cfg["use_bn"]), # Set bias to False when having a bn layer
+                nn.BatchNorm2d(out_f) if model_cfg["use_bn"] else nn.Identity(), # Batch Norm
+                nn.ReLU() # Activation
+            ]
         
         # Attention layer
-        if model_cfg["use_attention"] and last: layers.append(SEBlock(out_f))
+        if model_cfg["use_attention"]: layers.append(SEBlock(out_f))
         
         # Construct the main path
         self.block = nn.Sequential(*layers)
         
+        # Conv pool reduces activation maps using convolutions with stride = 2
+        if model_cfg["use_conv_pool"]:
+            self.pool = nn.Sequential(
+                            nn.Conv2d(out_f, out_f, kernel_size=3, padding=1, stride=2, groups=out_f, bias=not model_cfg["use_bn"]), # Convolutions applied per-channel
+                            nn.BatchNorm2d(out_f) if model_cfg["use_bn"] else nn.Identity(), # Batch Norm
+                            nn.ReLU(), # Activation
+                            nn.Conv2d(out_f, out_f, kernel_size=1, bias=not model_cfg["use_bn"]), # 1x1 convolution to mix channels
+                            nn.BatchNorm2d(out_f) if model_cfg["use_bn"] else nn.Identity(), # Batch Norm
+                            nn.ReLU() # Activation
+                        ) if not last or not model_cfg["use_gap"] else nn.Identity()
         # MaxPool only applied in the last block if there is not GAP layer before FC
-        self.pool = nn.MaxPool2d(2) if model_cfg["use_pool"] and (not model_cfg["use_gap"] or not last) else nn.Identity()
+        else:
+            self.pool = nn.MaxPool2d(2) if model_cfg["use_pool"] and (not model_cfg["use_gap"] or not last) else nn.Identity()
         
         # Residual connection
         self.shortcut = nn.Identity()
@@ -116,25 +164,37 @@ class ClassificationHead(nn.Module):
         return self.layers(x)
 
 class MCV_Net(nn.Module):    
-    def __init__(self, image_size: int, block_type: str = "baseline", num_classes: int = 8, init_chan: int = 20, num_blocks: int = 4):
+    def __init__(self, image_size: int, block_type: str = "baseline", num_classes: int = 8, 
+                 init_chan: int = 20, num_blocks: int = 4, filters: list = [12,24,48,96,128]):
         super(MCV_Net, self).__init__()
         
         # Configurations for the different types of block architectures
         configs = {
-            "baseline":   {"use_bn": False, "use_pool": False, "use_gap": False, "use_attention": False, "use_residual": False},
-            "maxpool":    {"use_bn": False, "use_pool": True, "use_gap": False, "use_attention": False, "use_residual": False},
-            "maxpool_bn": {"use_bn": True, "use_pool": True, "use_gap": False, "use_attention": False, "use_residual": False},
-            "maxpool_gap": {"use_bn": False,  "use_pool": True, "use_gap": True, "use_attention": False, "use_residual": False},
-            "maxpool_gap_bn": {"use_bn": True,  "use_pool": True, "use_gap": True, "use_attention": False, "use_residual": False},
-            "maxpool_gap_r": {"use_bn": False,  "use_pool": True, "use_gap": True, "use_attention": False, "use_residual": True},
+            "baseline":             {"use_bn": False, "use_pool": False, "use_gap": False, "use_attention": False, "use_residual": False, "use_dw": False, "use_conv_pool": False, "use_shuffle": False},
+            "maxpool":              {"use_bn": False, "use_pool": True,  "use_gap": False, "use_attention": False, "use_residual": False, "use_dw": False, "use_conv_pool": False, "use_shuffle": False},
+            "maxpool_bn":           {"use_bn": True,  "use_pool": True,  "use_gap": False, "use_attention": False, "use_residual": False, "use_dw": False, "use_conv_pool": False, "use_shuffle": False},
+            "maxpool_gap_bn":       {"use_bn": True,  "use_pool": True,  "use_gap": True,  "use_attention": False, "use_residual": False, "use_dw": False, "use_conv_pool": False, "use_shuffle": False},
+            "maxpool_gap_bn_dw":    {"use_bn": True,  "use_pool": True,  "use_gap": True,  "use_attention": False, "use_residual": False, "use_dw": True,  "use_conv_pool": False, "use_shuffle": False},
+            "maxpool_gap_bn_dw_at": {"use_bn": True,  "use_pool": True,  "use_gap": True,  "use_attention": True,  "use_residual": False, "use_dw": True,  "use_conv_pool": False, "use_shuffle": False},
+            "maxpool_gap_bn_dw_r":  {"use_bn": True,  "use_pool": True,  "use_gap": True,  "use_attention": False, "use_residual": True,  "use_dw": True,  "use_conv_pool": False, "use_shuffle": False},
+            "convpool_gap_bn_dw":   {"use_bn": True,  "use_pool": False, "use_gap": True,  "use_attention": False, "use_residual": False, "use_dw": True,  "use_conv_pool": True,  "use_shuffle": False},
+            "maxpool_gap_bn_dw_sh": {"use_bn": True,  "use_pool": True,  "use_gap": True,  "use_attention": False, "use_residual": False, "use_dw": True,  "use_conv_pool": False, "use_shuffle": True},
         }
         self.model_cfg = configs[block_type]
         
-        blocks = [MCV_Block(3, init_chan, self.model_cfg, last=False)]
+        # Define blocks using init_chan parameter
+        blocks = [MCV_Block(3, init_chan, self.model_cfg, first=True, last=False)]
         if num_blocks > 1:
-            mid_blocks=[MCV_Block(init_chan * i, init_chan * (i+1), self.model_cfg, last=False) for i in range (1, num_blocks-1)]
+            mid_blocks=[MCV_Block(init_chan * i, init_chan * (i+1), self.model_cfg, first=False, last=False) for i in range (1, num_blocks-1)]
             blocks.extend(mid_blocks)
-            blocks.append(MCV_Block(init_chan * (num_blocks-1), init_chan * num_blocks, self.model_cfg, last=True))
+            blocks.append(MCV_Block(init_chan * (num_blocks-1), init_chan * num_blocks, self.model_cfg, first=False, last=True))
+        
+        # Define blocks using filters parameter
+        """blocks = [MCV_Block(3, filters[0], self.model_cfg, first=True, last=False)]
+        if num_blocks > 1:
+            mid_blocks=[MCV_Block(filters[i-1], filters[i], self.model_cfg, first=False, last=False) for i in range (1, num_blocks-1)]
+            blocks.extend(mid_blocks)
+        blocks.append(MCV_Block(filters[-2], filters[-1], self.model_cfg, first=False, last=True))"""
         
         # Feature extractor backbone
         self.backbone = nn.Sequential(*blocks)
@@ -142,7 +202,8 @@ class MCV_Net(nn.Module):
         # Calculate number of flatten features before classification head
         if self.model_cfg["use_gap"]: 
             self.gap = nn.AdaptiveAvgPool2d(1) # Creates GAP layer
-            flat_features = init_chan * num_blocks
+            flat_features = init_chan * num_blocks # W/ init_chan parameter
+            #flat_features=filters[-1] # W/ filters parameter
         else:
             reducer = 2**num_blocks if self.model_cfg["use_pool"] else 1
             flat_features = init_chan * num_blocks * (image_size[0] // reducer) * (image_size[1] // reducer)
