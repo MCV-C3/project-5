@@ -16,7 +16,7 @@ if __name__ == "__main__":
     # UNIQUE PARAMETERS TO SET
     # True if you want Grad-CAM calculated from gt label. If desired Grad-CAM from predicted label set to False
     GT_GRAD_CAM = True
-    FOLDER_IDX = 1
+    CLASS_IDX = 1
     BLOCK_TYPE="maxpool_gap_bn" # Model with GAP
     #BLOCK_TYPE="maxpool_bn" # Model without GAP
     
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     ])
 
     # --- Search for a False Negative in a given folder ---
-    folder_path = os.path.expanduser(f"~/mcv/datasets/C3/2425/MIT_small_train_1/test/{idx_to_label[FOLDER_IDX]}/")
+    folder_path = os.path.expanduser(f"~/mcv/datasets/C3/2425/MIT_small_train_1/test/{idx_to_label[CLASS_IDX]}/")
     found_fn = False
 
     for filename in os.listdir(folder_path):
@@ -52,7 +52,7 @@ if __name__ == "__main__":
             _, predicted = output.max(1)
             pred_idx = predicted.item()
 
-        if pred_idx != FOLDER_IDX:
+        if pred_idx != CLASS_IDX:
             print(f"False Negative found: {filename} predicted as {idx_to_label[pred_idx]}")
             found_fn = True
             break # Stop loop and continue with this image
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     # --- GradCAM Logic ---
     target_layers = [model.backbone[3].block[2]] # Grad-CAM computed from last layer of feature extractor
     # Explaining the WRONG prediction found
-    targets = [ClassifierOutputTarget(FOLDER_IDX if GT_GRAD_CAM else pred_idx)]
+    targets = [ClassifierOutputTarget(CLASS_IDX if GT_GRAD_CAM else pred_idx)]
     
     # Required for GradCAM
     input_image.requires_grad = True
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     # Plot the result
     plt.imshow(visualization)
     plt.axis("off")
-    plt.title(f"GT: {idx_to_label[FOLDER_IDX]} | Pred: {idx_to_label[pred_idx]}")
+    plt.title(f"GT: {idx_to_label[CLASS_IDX]} | Pred: {idx_to_label[pred_idx]}")
     plt.savefig("./figures/grad_cam.png")
     plt.close("all")
 
