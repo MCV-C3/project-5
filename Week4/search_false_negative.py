@@ -8,26 +8,34 @@ from pytorch_grad_cam import GradCAM, HiResCAM, ScoreCAM, GradCAMPlusPlus, Ablat
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
 
-from models import WraperModel
+from models import MCV_Net
 
 if __name__ == "__main__":
     IMG_SIZE=(224, 224)
-    FOLDER_IDX = 1 # UNIQUE PARAMETER TO SET
+    
+    # UNIQUE PARAMETERS TO SET
+    # True if you want Grad-CAM calculated from gt label. If desired Grad-CAM from predicted label set to False
+    GT_GRAD_CAM = True
+    FOLDER_IDX = 1
+    BLOCK_TYPE="maxpool_gap_bn" # Model with GAP
+    #BLOCK_TYPE="maxpool_bn" # Model without GAP
+    
     idx_to_label = {0: "Opencountry", 1: "coast", 2: "forest", 3: "highway", 
                     4: "inside_city", 5: "mountain", 6: "street", 7: "tallbuilding"}
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     torch.manual_seed(42)
 
-    model = WraperModel(num_classes=8, feature_extraction=False)
-    model.load_state_dict(torch.load("./saved_models/fold-1_0.001_20.pt"))
+    model = MCV_Net(image_size=(224, 224), block_type=BLOCK_TYPE, num_classes=8, num_blocks=4, init_chan=20)
+    model.load_state_dict(torch.load(f"./saved_models/fold_1_{BLOCK_TYPE}.pt")) # Charge the model
     model.to(device)
     model.eval()
 
     transformation = F.Compose([
         F.ToImage(),
         F.ToDtype(torch.float32, scale=True),
-        F.Resize(size=IMG_SIZE)
+        F.Resize(size=IMG_SIZE),
+        F.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
     # --- Search for a False Negative in a given folder ---
@@ -54,9 +62,9 @@ if __name__ == "__main__":
         exit()
 
     # --- GradCAM Logic ---
-    target_layers = [model.backbone.features[16]]
+    target_layers = [model.backbone[3].block[2]] # Grad-CAM computed from last layer of feature extractor
     # Explaining the WRONG prediction found
-    targets = [ClassifierOutputTarget(pred_idx)] 
+    targets = [ClassifierOutputTarget(FOLDER_IDX if GT_GRAD_CAM else pred_idx)]
     
     # Required for GradCAM
     input_image.requires_grad = True
@@ -74,7 +82,7 @@ if __name__ == "__main__":
     plt.close("all")
 
     # --- Feature Maps Logic ---
-    f_maps, l_names = model.extract_feature_maps_by_block(input_image)
+    """f_maps, l_names = model.extract_feature_maps_by_block(input_image)
 
     fig, axes = plt.subplots(4, 4, figsize=(20, 20))
     axes = axes.flatten()
@@ -94,4 +102,4 @@ if __name__ == "__main__":
 
     plt.tight_layout()
     plt.savefig("./figures/feature_maps.png", dpi=150)
-    plt.close(fig)
+    plt.close(fig)"""

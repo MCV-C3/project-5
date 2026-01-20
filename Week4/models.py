@@ -78,6 +78,35 @@ class SEBlock(nn.Module):
         chan_weights = self.excitation(chan_weights).view(batch_size, num_channels, 1, 1)
         # Scale the original feature maps
         return x * chan_weights
+    
+class SpatialAttention(nn.Module):
+    def __init__(self, kernel_size=3):
+        super(SpatialAttention, self).__init__()
+        # Ensure kernel size is odd for symmetric padding
+        assert kernel_size in [3, 7], "kernel_size must be 3 or 7"
+        padding = 3 if kernel_size == 7 else 1
+        
+        # This convolution compresses 2 channels (avg and max) into 1 spatial mask
+        self.conv = nn.Conv2d(2, 1, kernel_size=kernel_size, 
+                              padding=padding, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        # 1. Generate Channel-wise Average and Max Pooling
+        # x has shape: (B, C, H, W)
+        avg_out = torch.mean(x, dim=1, keepdim=True) # (B, 1, H, W)
+        max_out, _ = torch.max(x, dim=1, keepdim=True) # (B, 1, H, W)
+        
+        # 2. Concatenate the two descriptors
+        # res has shape: (B, 2, H, W)
+        res = torch.cat([avg_out, max_out], dim=1)
+        
+        # 3. Apply convolution and Sigmoid to get the 2D mask
+        res = self.conv(res)
+        mask = self.sigmoid(res)
+        
+        # 4. Multiply the original input by the spatial mask
+        return x * mask
 
 class MCV_Block(nn.Module):
     def __init__(self, in_f, out_f, model_cfg, first, last):
@@ -104,7 +133,8 @@ class MCV_Block(nn.Module):
             ]
         
         # Attention layer
-        if model_cfg["use_attention"]: layers.append(SEBlock(out_f))
+        if model_cfg["use_attention"]: layers.append(SpatialAttention())
+        #if model_cfg["use_attention"]: layers.append(SEBlock(out_f))
         
         # Construct the main path
         self.block = nn.Sequential(*layers)
@@ -179,6 +209,7 @@ class MCV_Net(nn.Module):
             "maxpool_gap_bn_dw_r":  {"use_bn": True,  "use_pool": True,  "use_gap": True,  "use_attention": False, "use_residual": True,  "use_dw": True,  "use_conv_pool": False, "use_shuffle": False},
             "convpool_gap_bn_dw":   {"use_bn": True,  "use_pool": False, "use_gap": True,  "use_attention": False, "use_residual": False, "use_dw": True,  "use_conv_pool": True,  "use_shuffle": False},
             "maxpool_gap_bn_dw_sh": {"use_bn": True,  "use_pool": True,  "use_gap": True,  "use_attention": False, "use_residual": False, "use_dw": True,  "use_conv_pool": False, "use_shuffle": True},
+            "maxpool_gap_bn_dw_sh_at":{"use_bn": True,  "use_pool": True,  "use_gap": True,  "use_attention": True, "use_residual": False, "use_dw": True,  "use_conv_pool": False, "use_shuffle": True},
         }
         self.model_cfg = configs[block_type]
         
