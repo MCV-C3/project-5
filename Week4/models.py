@@ -109,7 +109,7 @@ class SpatialAttention(nn.Module):
         return x * mask
 
 class MCV_Block(nn.Module):
-    def __init__(self, in_f, out_f, model_cfg, first, last):
+    def __init__(self, in_f, out_f, model_cfg, first, last, dropout_prob_1=0.0):
         super(MCV_Block, self).__init__()
         g = 5 if in_f % 5 == 0 and out_f % 5 == 0 else 4
         
@@ -131,6 +131,10 @@ class MCV_Block(nn.Module):
                 nn.BatchNorm2d(out_f) if model_cfg["use_bn"] else nn.Identity(), # Batch Norm
                 nn.ReLU() if not model_cfg["use_prelu"] else nn.PReLU(num_parameters=1) # Activation
             ]
+        
+        # Dropout after convolutions
+        if dropout_prob_1 > 0:
+            layers.append(nn.Dropout2d(p=dropout_prob_1))
         
         # Attention layer
         #if model_cfg["use_attention"]: layers.append(SpatialAttention())
@@ -174,21 +178,27 @@ class MCV_Block(nn.Module):
         return out
     
 class ClassificationHead(nn.Module):
-    def __init__(self, flat_features, num_classes, model_cfg, units_fc):
+    def __init__(self, flat_features, num_classes, model_cfg, units_fc, dropout_prob_2=0.0):
         super(ClassificationHead, self).__init__()
         
         if model_cfg["use_gap"]: 
-            self.layers = nn.Sequential(
+            layers = [
                 nn.Flatten(),
-                nn.Linear(flat_features, num_classes)  
-            )          
+            ]
+            if dropout_prob_2 > 0:
+                layers.append(nn.Dropout(p=dropout_prob_2))
+            layers.append(nn.Linear(flat_features, num_classes))
+            self.layers = nn.Sequential(*layers)          
         else:
-            self.layers = nn.Sequential(
+            layers = [
                 nn.Flatten(),
                 nn.Linear(flat_features, units_fc),
                 nn.ReLU(),
-                nn.Linear(units_fc, num_classes)
-            )
+            ]
+            if dropout_prob_2 > 0:
+                layers.append(nn.Dropout(p=dropout_prob_2))
+            layers.append(nn.Linear(units_fc, num_classes))
+            self.layers = nn.Sequential(*layers)
     
     def forward(self, x):
         return self.layers(x)
@@ -196,7 +206,7 @@ class ClassificationHead(nn.Module):
 class MCV_Net(nn.Module):    
     def __init__(self, image_size: int, block_type: str = "baseline", num_classes: int = 8, init_chan: int = 20, 
                  num_blocks: int = 4, filters: list = [12,24,48,96,128], blocks_to_keep: list = None,
-                 units_fc: int = 64):
+                 units_fc: int = 64, dropout_prob_1: float = 0.0, dropout_prob_2: float = 0.0):
         super(MCV_Net, self).__init__()
         
         # Configurations for the different types of block architectures
@@ -216,11 +226,11 @@ class MCV_Net(nn.Module):
         self.model_cfg = configs[block_type]
         
         # Define blocks using init_chan parameter
-        blocks = [MCV_Block(3, init_chan, self.model_cfg, first=True, last=False)]
+        blocks = [MCV_Block(3, init_chan, self.model_cfg, first=True, last=False, dropout_prob_1=dropout_prob_1)]
         if num_blocks > 1:
-            mid_blocks=[MCV_Block(init_chan * i, init_chan * (i+1), self.model_cfg, first=False, last=False) for i in range (1, num_blocks-1)]
+            mid_blocks=[MCV_Block(init_chan * i, init_chan * (i+1), self.model_cfg, first=False, last=False, dropout_prob_1=dropout_prob_1) for i in range (1, num_blocks-1)]
             blocks.extend(mid_blocks)
-            blocks.append(MCV_Block(init_chan * (num_blocks-1), init_chan * num_blocks, self.model_cfg, first=False, last=True))
+            blocks.append(MCV_Block(init_chan * (num_blocks-1), init_chan * num_blocks, self.model_cfg, first=False, last=True, dropout_prob_1=dropout_prob_1))
         
         # Define blocks using filters parameter
         """blocks = [MCV_Block(3, filters[0], self.model_cfg, first=True, last=False)]
@@ -242,7 +252,7 @@ class MCV_Net(nn.Module):
             flat_features = init_chan * num_blocks * (image_size[0] // reducer) * (image_size[1] // reducer)
         
         # Classification Head
-        self.head = ClassificationHead(flat_features, num_classes, self.model_cfg, units_fc)
+        self.head = ClassificationHead(flat_features, num_classes, self.model_cfg, units_fc, dropout_prob_2=dropout_prob_2)
 
     def forward(self, x):
         features = self.backbone(x)

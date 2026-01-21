@@ -89,7 +89,8 @@ def run_experiment(wandb_config=None, experiment_config=None):
         "optimizer": "Adam",
         "momentum": 0.9,
         "weight_decay": 0.0,
-        "dropout_prob": 0.2,
+        "dropout_prob_1": 0.0,
+        "dropout_prob_2": 0.0,
         "filters": [15,30,45,60,75],
         "units_fc": 64,
     }
@@ -167,7 +168,8 @@ def run_experiment(wandb_config=None, experiment_config=None):
                                                         transform_train=train_transform)
   
         model = MCV_Net(image_size=cfg.image_size, block_type=cfg.block_type, init_chan=cfg.init_chan, 
-                        num_blocks=cfg.num_blocks, filters=cfg.filters, units_fc=cfg.units_fc)
+                        num_blocks=cfg.num_blocks, filters=cfg.filters, units_fc=cfg.units_fc,
+                        dropout_prob_1=cfg.dropout_prob_1, dropout_prob_2=cfg.dropout_prob_2)
         model = model.to(device)
 
         if num_params is None:
