@@ -513,7 +513,7 @@ image_size = {
     'method': 'grid',
     'parameters': {
         'block_type': {
-            'values':['maxpool_bn']
+            'values':['maxpool_gap_bn_dw_p']
         },
         'optimizer': {
             'values':[("Adam")]
@@ -537,13 +537,13 @@ image_size = {
             'values':[True]
         },
         'init_chan': {
-            'values': [20]
+            'values': [15]
         },
         'filters': {
             'values': [[]]
         },
         'num_blocks':{
-            'values': [4]
+            'values': [5]
         },
         'patience':{
             'values':[-1]
@@ -552,10 +552,10 @@ image_size = {
             'values':[0]
         },
         'k_folds': {
-            'values': [1]
+            'values': [4]
         },
         'save_weights': {
-            'values': [True]
+            'values': [False]
         },
         'num_workers': {
             'values': [8]
