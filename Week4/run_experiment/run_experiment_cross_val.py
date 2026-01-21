@@ -89,8 +89,9 @@ def run_experiment(wandb_config=None, experiment_config=None):
         "optimizer": "Adam",
         "momentum": 0.9,
         "weight_decay": 0.0,
-        "dropout_prob": 0.2, # Topology default
-        "filters": [15,30,45,60,75]
+        "dropout_prob": 0.2,
+        "filters": [15,30,45,60,75],
+        "units_fc": 64,
     }
     
     # Merge configs
@@ -166,7 +167,7 @@ def run_experiment(wandb_config=None, experiment_config=None):
                                                         transform_train=train_transform)
   
         model = MCV_Net(image_size=cfg.image_size, block_type=cfg.block_type, init_chan=cfg.init_chan, 
-                        num_blocks=cfg.num_blocks, filters=cfg.filters)
+                        num_blocks=cfg.num_blocks, filters=cfg.filters, units_fc=cfg.units_fc)
         model = model.to(device)
 
         if num_params is None:

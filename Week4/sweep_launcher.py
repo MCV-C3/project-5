@@ -234,6 +234,66 @@ maxpool_bn_data_aug = {
 
 # From here ALWAYS DATA AUG
 
+classifier_experiment = {
+    'method': 'grid',
+    'parameters': {
+        'block_type': {
+            'values':['maxpool_bn']
+        },
+        'optimizer': {
+            'values':[("Adam")]
+        },
+        'image_size': {
+            'values': [(224,224)]
+        },
+        'batch_size': {
+            'values': [16]
+        },
+        'learning_rate': {
+            'values': [0.001]
+        },
+        'output_dim': {
+            'values': [8]
+        },
+        'num_epochs': {
+            'values': [20]
+        }, 
+        'data_aug': {
+            'values':[True]
+        },
+        'init_chan': {
+            'values': [20]
+        },
+        'units_fc': {
+            'values': [16, 32, 64, 128, 256]
+        },
+        'num_blocks':{
+            'values': [4]
+        },
+        'patience':{
+            'values':[-1]
+        },
+        'min_delta':{
+            'values':[0]
+        },
+        'k_folds': {
+            'values': [4]
+        },
+        'save_weights': {
+            'values': [False]
+        },
+        'num_workers': {
+            'values': [8]
+        }
+    },
+    'metric': {
+        'name': 'test_accuracy',
+        'goal': 'maximize'   
+    }
+}
+
+
+
 maxpool_gap_bn = {
     'method': 'grid',
     'parameters': {

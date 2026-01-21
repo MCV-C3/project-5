@@ -174,7 +174,7 @@ class MCV_Block(nn.Module):
         return out
     
 class ClassificationHead(nn.Module):
-    def __init__(self, flat_features, num_classes, model_cfg):
+    def __init__(self, flat_features, num_classes, model_cfg, units_fc):
         super(ClassificationHead, self).__init__()
         
         if model_cfg["use_gap"]: 
@@ -185,9 +185,9 @@ class ClassificationHead(nn.Module):
         else:
             self.layers = nn.Sequential(
                 nn.Flatten(),
-                nn.Linear(flat_features, 64),
+                nn.Linear(flat_features, units_fc),
                 nn.ReLU(),
-                nn.Linear(64, num_classes)
+                nn.Linear(units_fc, num_classes)
             )
     
     def forward(self, x):
@@ -195,7 +195,8 @@ class ClassificationHead(nn.Module):
 
 class MCV_Net(nn.Module):    
     def __init__(self, image_size: int, block_type: str = "baseline", num_classes: int = 8, init_chan: int = 20, 
-                 num_blocks: int = 4, filters: list = [12,24,48,96,128], blocks_to_keep: list = None):
+                 num_blocks: int = 4, filters: list = [12,24,48,96,128], blocks_to_keep: list = None,
+                 units_fc: int = 64):
         super(MCV_Net, self).__init__()
         
         # Configurations for the different types of block architectures
@@ -241,7 +242,7 @@ class MCV_Net(nn.Module):
             flat_features = init_chan * num_blocks * (image_size[0] // reducer) * (image_size[1] // reducer)
         
         # Classification Head
-        self.head = ClassificationHead(flat_features, num_classes, self.model_cfg)
+        self.head = ClassificationHead(flat_features, num_classes, self.model_cfg, units_fc)
 
     def forward(self, x):
         features = self.backbone(x)
@@ -274,22 +275,22 @@ class MCV_Net(nn.Module):
         return grayscale_cam
     
     def prune_backbone(self, sensitivity=0.1):
-    """
-    Implements element-wise magnitude pruning.
-    1. Determines importance based on weight standard deviation.
-    2. Stores masks to be used during the training loop.
-    """
-    self.masks = {}
-    for name, param in self.named_parameters():
-        if 'weight' in name:
-            # Calculate threshold: std deviation * sensitivity
-            threshold = torch.std(param.data) * sensitivity
-            
-            # Create binary mask: 1 if weight > threshold, 0 otherwise
-            mask = torch.abs(param.data) > threshold
-            self.masks[name] = mask.to(param.device)
-            
-            # Apply mask immediately to zero out small weights
-            param.data *= self.masks[name]
-            
-    print(f"Pruning complete. Masks generated for {len(self.masks)} layers.")
+        """
+        Implements element-wise magnitude pruning.
+        1. Determines importance based on weight standard deviation.
+        2. Stores masks to be used during the training loop.
+        """
+        self.masks = {}
+        for name, param in self.named_parameters():
+            if 'weight' in name:
+                # Calculate threshold: std deviation * sensitivity
+                threshold = torch.std(param.data) * sensitivity
+                
+                # Create binary mask: 1 if weight > threshold, 0 otherwise
+                mask = torch.abs(param.data) > threshold
+                self.masks[name] = mask.to(param.device)
+                
+                # Apply mask immediately to zero out small weights
+                param.data *= self.masks[name]
+                
+        print(f"Pruning complete. Masks generated for {len(self.masks)} layers.")
