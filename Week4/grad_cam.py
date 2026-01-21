@@ -135,7 +135,6 @@ def visualize_result(visualization, gt_label, pred_label, vis_label, filename, s
     print(f"Result saved to {save_path}")
     plt.close("all")
 
-# --- Main Execution ---
 
 if __name__ == "__main__":
     # ================= CONFIGURATION =================
@@ -144,7 +143,7 @@ if __name__ == "__main__":
     
     NUM_CLASSES = 8
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    DEVICE = torch.device("cpu")
+    # DEVICE = torch.device("cpu")
     
     # Dataset / Labels
     IDX_TO_LABEL = {0: "Opencountry", 1: "coast", 2: "forest", 3: "highway", 
@@ -155,8 +154,8 @@ if __name__ == "__main__":
     DATASET_ROOT = os.path.expanduser(f"~/mcv/datasets/C3/2425/MIT_small_train_1/test/{IDX_TO_LABEL[SEARCH_CLASS_IDX]}/")
     
     # Single Image Mode (Set path to process 1 specific image, or None to search folder)
-    SINGLE_IMAGE_PATH = None 
     SINGLE_IMAGE_PATH = f"/ghome/group05/mcv/datasets/C3/2425/MIT_small_train_1/test/{IDX_TO_LABEL[SEARCH_CLASS_IDX]}/nat11.jpg" 
+    SINGLE_IMAGE_PATH = None 
 
     # Neuron Selection
     # If None: Visualize neuron with highest confidence (Predicted Class)
