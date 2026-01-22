@@ -2,8 +2,8 @@ import wandb
 from run_experiment.run_experiment_cross_val import run_experiment
 #from run_experiment.run_experiment_test import run_experiment
 
-DO_HYPERPARAM_SEARCH = False
-NUM_RUNS = 50
+DO_HYPERPARAM_SEARCH = True
+NUM_RUNS = None
 
 # Wandb configuration
 wandb_config = {
@@ -291,8 +291,6 @@ classifier_experiment = {
         'goal': 'maximize'   
     }
 }
-
-
 
 maxpool_gap_bn = {
     'method': 'grid',
@@ -627,13 +625,90 @@ image_size = {
     }
 }
 
+hyperparam_search_random = {
+    'method': 'random',
+    'metric': {
+        'name': 'distance',
+        'goal': 'minimize'   
+    },
+    'parameters': {
+        'block_type': {
+            'values':['maxpool_gap_bn_dw_p']
+        },
+        'image_size': {
+            'values': [(224,224)]
+        },
+        'output_dim': {
+            'values': [8]
+        },
+        'data_aug': {
+            'values':[True]
+        },
+        'init_chan': {
+            'values': [15]
+        },
+        'filters': {
+            'values': [[]]
+        },
+        'num_blocks':{
+            'values': [5]
+        },
+        'patience':{
+            'values':[10]
+        },
+        'min_delta':{
+            'values':[0.001]
+        },
+        'k_folds': {
+            'values': [4]
+        },
+        'save_weights': {
+            'values': [False]
+        },
+        'num_workers': {
+            'values': [8]
+        },
+
+        # --- HYPERPARAMETERS TO SEARCH ---
+        
+        # 1. Training Dynamics
+        'batch_size': {
+            'values': [8, 16, 32, 64]
+        },
+        'num_epochs': {
+            'values': [20, 50, 100]
+        },
+        'learning_rate': {
+            'values': [0.0001, 0.001, 0.01, 0.1]
+        },
+        
+        # 2. Optimizer & Momentum
+        'optimizer': {
+            'values': ['SGD', 'RMSprop', 'Adagrad', 'Adadelta', 'Adam', 'Adamax', 'Nadam']
+        },
+        'momentum': {
+            'values': [0.0, 0.5, 0.9]
+        },
+
+        # 3. Regularization & Topology
+        'dropout_prob_1': { # Dropout convolutional layers
+            'values': [0.0, 0.1, 0.2, 0.3] 
+        },
+        'dropout_prob_2': { # Dropout classifier layers
+            'values': [0.0, 0.2, 0.3, 0.5] 
+        },
+        'weight_decay': { # Regularizers (L2 penalty)
+            'values': [0.0, 0.000001, 0.00001, 0.0001, 0.001] 
+        }
+    }
+}
 
 def run_experiment_with_wandb_config():
     """Wrapper function to pass wandb_config to run_experiment."""
     run_experiment(wandb_config=wandb_config)
 
 if __name__ == "__main__":
-    sweep_id = wandb.sweep(image_size, project=wandb_config["project"], entity=wandb_config["entity"])
+    sweep_id = wandb.sweep(hyperparam_search_random, project=wandb_config["project"], entity=wandb_config["entity"])
     print(f"Initiated sweep with ID: {sweep_id}")
 
     if DO_HYPERPARAM_SEARCH:
