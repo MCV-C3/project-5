@@ -703,12 +703,101 @@ hyperparam_search_random = {
     }
 }
 
+hyperparam_search_bayes = {
+    'method': 'bayes',
+    'metric': {
+        'name': 'distance',
+        'goal': 'minimize'   
+    },
+    'parameters': {
+        'block_type': {
+            'values':['maxpool_gap_bn_dw_p']
+        },
+        'image_size': {
+            'values': [(224,224)]
+        },
+        'output_dim': {
+            'values': [8]
+        },
+        'data_aug': {
+            'values':[True]
+        },
+        'init_chan': {
+            'values': [15]
+        },
+        'filters': {
+            'values': [[]]
+        },
+        'num_blocks':{
+            'values': [5]
+        },
+        'patience':{
+            'values':[10]
+        },
+        'min_delta':{
+            'values':[0.001]
+        },
+        'k_folds': {
+            'values': [4]
+        },
+        'save_weights': {
+            'values': [False]
+        },
+        'num_workers': {
+            'values': [8]
+        },
+
+        # --- HYPERPARAMETERS TO SEARCH ---
+
+        # 1. Training Dynamics
+        'batch_size': {
+            'values': [8, 16, 32, 64]
+        },
+        'num_epochs': {
+            'values': [50, 100]
+        },
+        'learning_rate': {
+            'distribution': 'log_uniform_values',
+            'min': 0.0005,
+            'max': 0.02
+        },
+        
+        # 2. Optimizer & Momentum
+        'optimizer': {
+            'values': ['Adamax', 'Nadam', 'RMSprop']
+        },
+        'momentum': {
+            'distribution': 'uniform',
+            'min': 0.45,
+            'max': 0.95
+        },
+
+        # 3. Regularization
+        'dropout_prob_1': {
+            'distribution': 'uniform',
+            'min': 0.0,
+            'max': 0.25
+        },
+        'dropout_prob_2': {
+            'distribution': 'uniform',
+            'min': 0.0,
+            'max': 0.55
+        },
+        'weight_decay': {
+            'distribution': 'log_uniform_values',
+            'min': 1e-07,
+            'max': 0.005
+        }
+    }
+}
+
+
 def run_experiment_with_wandb_config():
     """Wrapper function to pass wandb_config to run_experiment."""
     run_experiment(wandb_config=wandb_config)
 
 if __name__ == "__main__":
-    sweep_id = wandb.sweep(hyperparam_search_random, project=wandb_config["project"], entity=wandb_config["entity"])
+    sweep_id = wandb.sweep(hyperparam_search_bayes, project=wandb_config["project"], entity=wandb_config["entity"])
     print(f"Initiated sweep with ID: {sweep_id}")
 
     if DO_HYPERPARAM_SEARCH:
