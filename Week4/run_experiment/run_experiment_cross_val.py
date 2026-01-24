@@ -50,6 +50,7 @@ def get_optimizer (model, cfg):
 
 def get_loaders_for_fold(fold_idx, batch_size=32, transform_train=None, transform_test=None, num_workers=8):
     fold_dir = f"MIT_small_train_{fold_idx}"
+    # fold_dir = f"MIT_large_train"
     
     train_path = os.path.join(BASE_PATH, fold_dir, "train")
     test_path = os.path.join(BASE_PATH, fold_dir, "test")
@@ -171,6 +172,10 @@ def run_experiment(wandb_config=None, experiment_config=None):
                         num_blocks=cfg.num_blocks, filters=cfg.filters, units_fc=cfg.units_fc,
                         dropout_prob_1=cfg.dropout_prob_1, dropout_prob_2=cfg.dropout_prob_2)
         model = model.to(device)
+
+        if cfg.pretrained_weights_path and os.path.exists(cfg.pretrained_weights_path):
+            model.load_state_dict(torch.load(cfg.pretrained_weights_path))
+            print(f"Loaded pretrained weights from {cfg.pretrained_weights_path}")
 
         if num_params is None:
             num_params = get_model_parameters(model)

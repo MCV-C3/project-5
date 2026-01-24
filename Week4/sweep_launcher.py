@@ -792,12 +792,101 @@ hyperparam_search_bayes = {
 }
 
 
+sweep_config = {
+    'method': 'grid', 
+    'metric': {
+        'name': 'fold_accuracy_mean',
+        'goal': 'maximize'   
+    },
+    'parameters': {
+        # --- TARGET EXPERIMENT PARAMS (T=1, Alpha=0.1) ---
+        # 'alpha': {
+        #     'values': [0.1] 
+        # },
+        # 'temperature': {
+        #     'values': [1.0]
+        # },
+        
+        # --- FIXED PARAMETERS ---
+        'model_type': {
+            'values': ['mcv']
+        },
+        # 'distill': {
+        #     'values': [True]
+        # },
+        # 'teacher_model_type': {
+        #     'values': ['convnext_tiny']
+        # },
+        # 'teacher_weights': {
+        #     'values': [TEACHER_WEIGHTS_PATH]
+        # },
+        'block_type': {
+            'values': ['maxpool_gap_bn_dw_p']
+        },
+        'pretrained_weights_path': {
+            'values': ['./saved_models/fold_1_distiling.pt']
+        },
+        'filters': {
+            'values': [[12,24,36,48,60]]
+        },
+        'init_chan': {
+            'values': [12]
+        },
+        'num_blocks':{
+            'values': [5]
+        },
+        'patience':{
+            'values':[10]
+        },
+        'min_delta':{
+            'values':[0.001]
+        },
+        'k_folds': {
+            'values': [1]
+        },
+        'num_epochs': {
+            'values': [100]
+        },
+        'batch_size': {
+            'values': [64]
+        },
+        'data_aug': {
+            'values': [True]
+        },
+        'save_weights': {
+            'values': [True]
+        },
+        'num_workers': {
+            'values': [8]
+        },
+        'dropout_prob_1': {
+            'values': [0.0024918879744524336]
+        },
+        'dropout_prob_2': {
+            'values': [0.3886727784732117]
+        },
+        'learning_rate': {
+            'values': [0.0007955281528509873]
+        },
+        'momentum': {
+            'values': [0.7582520845191429]
+        },
+        'optimizer': {
+            'values': ['RMSprop']
+        },
+        'weight_decay': {
+            'values': [1.199948210802673e-06]
+        }
+    }
+}
+
+
 def run_experiment_with_wandb_config():
     """Wrapper function to pass wandb_config to run_experiment."""
     run_experiment(wandb_config=wandb_config)
 
 if __name__ == "__main__":
-    sweep_id = wandb.sweep(hyperparam_search_bayes, project=wandb_config["project"], entity=wandb_config["entity"])
+    sweep_id = wandb.sweep(sweep_config, project=wandb_config["project"], entity=wandb_config["entity"])
     print(f"Initiated sweep with ID: {sweep_id}")
 
     if DO_HYPERPARAM_SEARCH:
